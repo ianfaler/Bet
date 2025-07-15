@@ -271,11 +271,85 @@ Individual Bet Cap: 5% of bankroll maximum
 Kelly Fraction: Quarter-Kelly sizing (25% of full Kelly)
 Confidence Scaling: Stakes adjusted by confidence score
 Sharp Money Bonus: Double stakes for confidence ≥9
-🌟 Production Readiness
-✅ Specification Compliance
 
-Multi-sport support (MLB, NBA, Soccer, WNBA, NHL)
-Real API integration with retry logic
-Sharp betting indicators (RLM, CLV, Steam)
-Sophisticated probability models
-Kelly
+## 📊 Historical Data Download
+
+### **Download Scripts Available**
+```bash
+# Download MLB historical data
+python3 simple_data_downloader.py --mlb
+
+# Test FootyStats API and download soccer samples
+python3 simple_data_downloader.py --soccer --test-api
+
+# Download all available data
+python3 simple_data_downloader.py --all
+```
+
+### **API Keys Configured**
+- **FootyStats API**: `b44de69d5777cd2c78d81d59a85d0a91154e836320016b53ecdc1f646fc95b97`
+- **The Odds API**: `f25b4597c8275546821c5d47a2f727eb`
+- **SportsData.io**: Direct download URL for MLB historical data
+
+### **Soccer Leagues (50 Total)**
+🇦🇷 Argentina: Primera División, Primera Nacional  
+🇦🇺 Australia: A-League  
+🇦🇹 Austria: Bundesliga  
+🇧🇪 Belgium: Pro League  
+🇧🇷 Brazil: Serie A  
+🇨🇱 Chile: Primera Division  
+🇨🇳 China: Super League  
+🇨🇴 Colombia: Primera A  
+🇭🇷 Croatia: HNL  
+🇨🇾 Cyprus: First Division  
+🇨🇿 Czech Republic: First League  
+🇩🇰 Denmark: Superliga, 1st Division  
+🇪🇨 Ecuador: Serie A  
+🏴󠁧󠁢󠁥󠁮󠁧󠁿 England: Premier League, Championship  
+🇫🇷 France: Ligue 1, Ligue 2  
+🇩🇪 Germany: Bundesliga, 2. Bundesliga  
+🇬🇷 Greece: Super League  
+🇮🇳 India: Super League  
+🇮🇱 Israel: Premier League  
+🇮🇹 Italy: Serie A, Serie B  
+🇯🇵 Japan: J1 League, J2 League  
+🇲🇽 Mexico: Liga MX  
+🇳🇱 Netherlands: Eredivisie  
+🇳🇴 Norway: Eliteserien, OBOS-ligaen  
+🇵🇪 Peru: Liga 1  
+🇵🇱 Poland: Ekstraklasa  
+🇵🇹 Portugal: Primeira Liga  
+🇶🇦 Qatar: Stars League  
+🇷🇴 Romania: Liga I  
+🇷🇺 Russia: Premier League  
+🇸🇦 Saudi Arabia: Professional League  
+🏴󠁧󠁢󠁳󠁣󠁴󠁿 Scotland: Premiership  
+🇷🇸 Serbia: SuperLiga  
+🇰🇷 South Korea: K League 1  
+🇪🇸 Spain: La Liga, LaLiga2  
+🇸🇪 Sweden: Allsvenskan  
+🇨🇭 Switzerland: Super League  
+🇹🇷 Turkey: Super Lig  
+🇺🇦 Ukraine: Premier League  
+🇺🇸 United States: MLS  
+🇺🇾 Uruguay: Primera Division
+
+### **Data Structure**
+```
+historical_data/
+├── mlb/
+│   └── mlb_historical_data_YYYYMMDD.zip
+├── soccer/
+│   ├── test_responses/
+│   └── league_data/
+└── API_CONFIGURATION.md
+```
+
+## 🌟 Production Readiness
+✅ **Specification Compliance**
+- Multi-sport support (MLB, NBA, Soccer, WNBA, NHL)
+- Real API integration with retry logic  
+- Sharp betting indicators (RLM, CLV, Steam)
+- Sophisticated probability models
+- Kelly Criterion risk management
+- Historical data pipeline for ML training

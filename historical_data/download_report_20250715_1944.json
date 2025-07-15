@@ -1,0 +1,15 @@
+{
+  "download_date": "2025-07-15T19:44:11.505517",
+  "api_keys_configured": {
+    "footystats": "b44de69d5777cd2c78d8...",
+    "odds_api": "f25b4597c8275546821c...",
+    "sportsdata_io": "Direct download URL"
+  },
+  "mlb_data": {
+    "files": 1,
+    "latest_file": "historical_data/mlb/mlb_historical_data_20250715.zip"
+  },
+  "soccer_data": {},
+  "total_files": 3,
+  "total_size_mb": 57.88446617126465
+}
