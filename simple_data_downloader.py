@@ -25,7 +25,14 @@ from typing import Dict, List, Optional, Any
 import logging
 
 # Import correct FootyStats configuration with 2025 league IDs
-from footystats_config import FOOTYSTATS_API_KEY, FOOTYSTATS_LEAGUE_IDS, LEAGUE_BY_COUNTRY
+from footystats_config import (
+    FOOTYSTATS_API_KEY, 
+    FOOTYSTATS_LEAGUE_IDS, 
+    LEAGUE_BY_COUNTRY,
+    FOOTYSTATS_BASE_URL,
+    get_league_teams_url,
+    get_league_season_url
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -137,13 +144,11 @@ class SimpleDataDownloader:
         
         # Test FootyStats API with correct parameters
         try:
-            url = "https://api.footystats.org/league-matches"
-            params = {
-                'key': API_KEYS["footystats"],
-                'league_id': '13943',  # Premier League 2025 ID
-                'season': '2025'
-            }
-            response = self.session.get(url, params=params, timeout=10)
+            # Test with Premier League season endpoint
+            url = get_league_season_url(13943)  # Premier League 2025 season_id
+            logger.info(f"Testing FootyStats API: {url}")
+            
+            response = self.session.get(url, timeout=10)
             connectivity["footystats"] = response.status_code in [200, 422]  # 422 = valid API, invalid params
             
             if response.status_code == 200:
@@ -252,66 +257,86 @@ class SimpleDataDownloader:
         return soccer_result
     
     def _download_league_matches(self, league_id: int, league_name: str) -> Optional[List[Dict]]:
-        """Download matches for a specific league using FootyStats API."""
+        """Download data for a specific league using FootyStats API."""
         
         try:
-            url = "https://api.footystats.org/league-matches"
+            # Use correct FootyStats API endpoints with season_id
+            logger.debug(f"Downloading data for {league_name} (season_id: {league_id})")
             
-            # Try current season first, then previous season if no data
-            current_year = datetime.now().year
-            seasons_to_try = [current_year, current_year - 1]
+            # Get season info
+            season_url = get_league_season_url(league_id)
+            logger.debug(f"Season URL: {season_url}")
             
-            for season in seasons_to_try:
-                params = {
-                    'key': API_KEYS["footystats"],
-                    'league_id': str(league_id),
-                    'season': str(season)
-                }
+            season_response = self.session.get(season_url, timeout=30)
+            
+            combined_data = []
+            
+            if season_response.status_code == 200:
+                season_data = season_response.json()
+                logger.debug(f"✅ Season data retrieved for {league_name}")
                 
-                logger.debug(f"Trying {league_name} for season {season}")
+                # Get teams with stats
+                teams_url = get_league_teams_url(league_id, include_stats=True)
+                logger.debug(f"Teams URL: {teams_url}")
                 
-                response = self.session.get(url, params=params, timeout=30)
+                teams_response = self.session.get(teams_url, timeout=30)
                 
-                if response.status_code == 200:
-                    data = response.json()
+                if teams_response.status_code == 200:
+                    teams_data = teams_response.json()
                     
                     # Handle different response formats
-                    if isinstance(data, dict):
-                        matches = data.get('data', [])
-                    elif isinstance(data, list):
-                        matches = data
+                    if isinstance(teams_data, dict):
+                        teams = teams_data.get('data', [])
+                    elif isinstance(teams_data, list):
+                        teams = teams_data
                     else:
-                        logger.warning(f"Unexpected data format for {league_name}")
-                        continue
+                        teams = []
                     
-                    if matches:
-                        # Add metadata to each match
-                        for match in matches:
-                            match['league_name'] = league_name
-                            match['league_id'] = league_id
-                            match['season'] = season
-                            match['downloaded_at'] = datetime.now().isoformat()
-                        
-                        self.api_stats["footystats"]["success"] += 1
-                        return matches
-                    else:
-                        logger.debug(f"No matches found for {league_name} season {season}")
-                
-                elif response.status_code == 422:
-                    logger.debug(f"Invalid parameters for {league_name} season {season}")
-                    continue
-                elif response.status_code == 429:
-                    logger.warning(f"Rate limited for {league_name}, waiting...")
-                    self.api_stats["footystats"]["rate_limited"] += 1
-                    time.sleep(5)
-                    continue
+                    # Add metadata to teams data
+                    for team in teams:
+                        team['league_name'] = league_name
+                        team['season_id'] = league_id
+                        team['downloaded_at'] = datetime.now().isoformat()
+                    
+                    # Combine season and teams data
+                    combined_data = {
+                        'league_name': league_name,
+                        'season_id': league_id,
+                        'season_info': season_data,
+                        'teams': teams,
+                        'downloaded_at': datetime.now().isoformat()
+                    }
+                    
+                    logger.debug(f"✅ Found {len(teams)} teams for {league_name}")
+                    self.api_stats["footystats"]["success"] += 1
+                    return [combined_data]  # Return as list for consistency
+                    
                 else:
-                    logger.warning(f"API error {response.status_code} for {league_name}")
-                    continue
-            
-            # If we get here, no data was found for any season
-            self.api_stats["footystats"]["failures"] += 1
-            return None
+                    logger.warning(f"Could not fetch teams for {league_name}: {teams_response.status_code}")
+                    # Still return season data if available
+                    combined_data = {
+                        'league_name': league_name,
+                        'season_id': league_id,
+                        'season_info': season_data,
+                        'teams': [],
+                        'downloaded_at': datetime.now().isoformat()
+                    }
+                    self.api_stats["footystats"]["success"] += 1
+                    return [combined_data]
+                    
+            elif season_response.status_code == 422:
+                logger.debug(f"Invalid parameters for {league_name} (season_id: {league_id})")
+                self.api_stats["footystats"]["failures"] += 1
+                return None
+            elif season_response.status_code == 429:
+                logger.warning(f"Rate limited for {league_name}, waiting...")
+                self.api_stats["footystats"]["rate_limited"] += 1
+                time.sleep(5)
+                return None
+            else:
+                logger.warning(f"API error {season_response.status_code} for {league_name}")
+                self.api_stats["footystats"]["failures"] += 1
+                return None
             
         except Exception as e:
             logger.error(f"Exception downloading {league_name}: {e}")

@@ -1,10 +1,20 @@
 # FootyStats League Configuration
-# Updated with correct 2025 season league IDs
+# Updated with correct API endpoints and 2025 season IDs
 # Generated: 2025-01-07
 
 FOOTYSTATS_API_KEY = "b44de69d5777cd2c78d81d59a85d0a91154e836320016b53ecdc1f646fc95b97"
 
-# 50 Major Soccer Leagues Configuration - 2025 Season League IDs
+# Correct FootyStats API Base URL
+FOOTYSTATS_BASE_URL = "https://api.football-data-api.com"
+
+# API Endpoints
+FOOTYSTATS_ENDPOINTS = {
+    "league_teams": "league-teams",
+    "league_season": "league-season",
+    "league_matches": "league-matches"  # If available
+}
+
+# 52 Major Soccer Leagues Configuration - 2025 Season IDs
 FOOTYSTATS_LEAGUE_IDS = {
     "Argentine Primera División": 13945,
     "Argentina Primera Nacional": 13948,
@@ -59,6 +69,21 @@ FOOTYSTATS_LEAGUE_IDS = {
     "US MLS": 13973,
     "Uruguayan Primera Division": 13996,
 }
+
+# Helper functions to build API URLs
+def get_league_teams_url(season_id: int, include_stats: bool = True) -> str:
+    """Build URL for league teams endpoint."""
+    url = f"{FOOTYSTATS_BASE_URL}/{FOOTYSTATS_ENDPOINTS['league_teams']}"
+    params = f"?key={FOOTYSTATS_API_KEY}&season_id={season_id}"
+    if include_stats:
+        params += "&include=stats"
+    return url + params
+
+def get_league_season_url(season_id: int) -> str:
+    """Build URL for league season endpoint."""
+    url = f"{FOOTYSTATS_BASE_URL}/{FOOTYSTATS_ENDPOINTS['league_season']}"
+    params = f"?key={FOOTYSTATS_API_KEY}&season_id={season_id}"
+    return url + params
 
 # League mapping by country for organization
 LEAGUE_BY_COUNTRY = {
@@ -196,4 +221,15 @@ LEAGUE_BY_COUNTRY = {
     "Uruguay": {
         "Uruguayan Primera Division": 13996
     }
+}
+
+# Pre-built URLs for convenience
+LEAGUE_TEAMS_URLS = {
+    league_name: get_league_teams_url(season_id)
+    for league_name, season_id in FOOTYSTATS_LEAGUE_IDS.items()
+}
+
+LEAGUE_SEASON_URLS = {
+    league_name: get_league_season_url(season_id)
+    for league_name, season_id in FOOTYSTATS_LEAGUE_IDS.items()
 }

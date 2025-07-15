@@ -19,7 +19,14 @@ import logging
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 # Import correct FootyStats configuration
-from footystats_config import FOOTYSTATS_API_KEY, FOOTYSTATS_LEAGUE_IDS, LEAGUE_BY_COUNTRY
+from footystats_config import (
+    FOOTYSTATS_API_KEY, 
+    FOOTYSTATS_LEAGUE_IDS, 
+    LEAGUE_BY_COUNTRY,
+    FOOTYSTATS_BASE_URL,
+    get_league_teams_url,
+    get_league_season_url
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -286,50 +293,55 @@ class EnhancedDataDownloader:
     
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     def _download_footystats(self, league_id: int, timeframe: str) -> Optional[List]:
-        """Download data from FootyStats API using correct 2025 league IDs."""
+        """Download data from FootyStats API using correct API structure."""
         
         try:
-            url = "https://api.footystats.org/league-matches"
+            # Use correct FootyStats API endpoints
+            # Try league-season endpoint first
+            season_url = get_league_season_url(league_id)
+            logger.debug(f"FootyStats season request: {season_url}")
             
-            # Determine season based on timeframe
-            current_year = datetime.now().year
-            if timeframe == "recent":
-                season = current_year
-            elif timeframe == "season":
-                season = current_year
-            else:  # historical
-                season = current_year - 1
-            
-            params = {
-                'key': API_KEYS["footystats"],
-                'league_id': str(league_id),
-                'season': str(season)
-            }
-            
-            logger.debug(f"FootyStats request: {url} with params {params}")
-            
-            response = self.session.get(url, params=params, timeout=30)
+            response = self.session.get(season_url, timeout=30)
             
             if response.status_code == 200:
-                data = response.json()
+                season_data = response.json()
+                logger.debug(f"✅ FootyStats season data retrieved for season_id {league_id}")
                 
-                # Handle different response formats
-                if isinstance(data, dict):
-                    matches = data.get('data', [])
-                elif isinstance(data, list):
-                    matches = data
+                # Also get teams data with stats
+                teams_url = get_league_teams_url(league_id, include_stats=True)
+                logger.debug(f"FootyStats teams request: {teams_url}")
+                
+                teams_response = self.session.get(teams_url, timeout=30)
+                
+                combined_data = {
+                    "season_info": season_data,
+                    "teams": []
+                }
+                
+                if teams_response.status_code == 200:
+                    teams_data = teams_response.json()
+                    
+                    # Handle different response formats
+                    if isinstance(teams_data, dict):
+                        teams = teams_data.get('data', [])
+                    elif isinstance(teams_data, list):
+                        teams = teams_data
+                    else:
+                        teams = []
+                    
+                    combined_data["teams"] = teams
+                    logger.debug(f"✅ FootyStats returned {len(teams)} teams for season_id {league_id}")
                 else:
-                    logger.warning(f"⚠️  Unexpected data format from FootyStats")
-                    return None
+                    logger.warning(f"⚠️  Could not fetch teams data: {teams_response.status_code}")
                 
-                logger.debug(f"✅ FootyStats returned {len(matches)} matches for league {league_id}")
-                return matches
+                # Return the combined data as a list for compatibility
+                return [combined_data]
                 
             elif response.status_code == 422:
-                logger.warning(f"⚠️  Invalid parameters for FootyStats league {league_id}")
+                logger.warning(f"⚠️  Invalid parameters for FootyStats season_id {league_id}")
                 return None
             elif response.status_code == 404:
-                logger.warning(f"⚠️  No data found for FootyStats league {league_id}")
+                logger.warning(f"⚠️  No data found for FootyStats season_id {league_id}")
                 return None
             else:
                 logger.warning(f"⚠️  FootyStats API error {response.status_code}")

@@ -25,8 +25,16 @@ from typing import Dict, List, Optional, Tuple
 import logging
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-# Import FootyStats configuration with correct 2025 league IDs
-from footystats_config import FOOTYSTATS_API_KEY, FOOTYSTATS_LEAGUE_IDS, LEAGUE_BY_COUNTRY
+# Import FootyStats configuration with correct API structure
+from footystats_config import (
+    FOOTYSTATS_API_KEY, 
+    FOOTYSTATS_LEAGUE_IDS, 
+    LEAGUE_BY_COUNTRY,
+    FOOTYSTATS_BASE_URL,
+    FOOTYSTATS_ENDPOINTS,
+    get_league_teams_url,
+    get_league_season_url
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -370,44 +378,56 @@ class DataManager:
         """Fetch season data from FootyStats API using correct structure."""
         
         try:
-            # FootyStats API endpoint for league matches
-            url = "https://api.footystats.org/league-matches"
+            # Use correct FootyStats API endpoints and parameters
             
-            params = {
-                'key': FOOTYSTATS_API_KEY,
-                'league_id': str(league_id),
-                'season': str(season_year)
+            # Try league-season endpoint first (general season info)
+            season_url = get_league_season_url(league_id)
+            logger.debug(f"Fetching season data from: {season_url}")
+            
+            response = self.session.get(season_url, timeout=30)
+            
+            season_data = {
+                "season_id": league_id,
+                "season_year": season_year,
+                "teams": [],
+                "season_info": {},
+                "fetched_at": datetime.now().isoformat()
             }
-            
-            logger.debug(f"Fetching data for league {league_id}, season {season_year}")
-            
-            response = self.session.get(url, params=params, timeout=30)
             
             if response.status_code == 200:
                 data = response.json()
+                logger.debug(f"✅ Season data fetched successfully")
                 
-                # Structure the data properly
-                season_data = {
-                    "league_id": league_id,
-                    "season": season_year,
-                    "matches": data.get('data', []) if isinstance(data, dict) else data,
-                    "fetched_at": datetime.now().isoformat()
-                }
+                # Store season info
+                season_data["season_info"] = data
+                
+                # Also try to get teams with stats
+                teams_url = get_league_teams_url(league_id, include_stats=True)
+                logger.debug(f"Fetching teams data from: {teams_url}")
+                
+                teams_response = self.session.get(teams_url, timeout=30)
+                
+                if teams_response.status_code == 200:
+                    teams_data = teams_response.json()
+                    season_data["teams"] = teams_data.get('data', []) if isinstance(teams_data, dict) else teams_data
+                    logger.debug(f"✅ Teams data fetched: {len(season_data['teams'])} teams")
+                else:
+                    logger.warning(f"⚠️  Could not fetch teams data: {teams_response.status_code}")
                 
                 return season_data
                 
             elif response.status_code == 422:
-                logger.warning(f"⚠️  Invalid parameters for league {league_id}, season {season_year}")
+                logger.warning(f"⚠️  Invalid parameters for season_id {league_id}")
                 return None
             elif response.status_code == 404:
-                logger.warning(f"⚠️  No data found for league {league_id}, season {season_year}")
+                logger.warning(f"⚠️  No data found for season_id {league_id}")
                 return None
             else:
-                logger.warning(f"⚠️  FootyStats API error {response.status_code} for league {league_id}")
+                logger.warning(f"⚠️  FootyStats API error {response.status_code} for season_id {league_id}")
                 return None
                 
         except Exception as e:
-            logger.error(f"❌ Failed to fetch season data for league {league_id}: {e}")
+            logger.error(f"❌ Failed to fetch season data for season_id {league_id}: {e}")
             return None
     
     def _generate_sample_soccer_data(self) -> bool:

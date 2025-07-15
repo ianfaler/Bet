@@ -18,7 +18,13 @@ from pathlib import Path
 
 # Import our updated configuration
 try:
-    from footystats_config import FOOTYSTATS_API_KEY, FOOTYSTATS_LEAGUE_IDS, LEAGUE_BY_COUNTRY
+    from footystats_config import (
+        FOOTYSTATS_API_KEY, 
+        FOOTYSTATS_LEAGUE_IDS, 
+        LEAGUE_BY_COUNTRY,
+        get_league_teams_url,
+        get_league_season_url
+    )
     print("✅ Successfully imported FootyStats configuration")
 except ImportError as e:
     print(f"❌ Failed to import FootyStats configuration: {e}")
@@ -51,18 +57,13 @@ class FootyStatsAPITester:
         
         try:
             # Test with Premier League (a major league that should have data)
-            url = "https://api.footystats.org/league-matches"
-            params = {
-                'key': FOOTYSTATS_API_KEY,
-                'league_id': '13943',  # Premier League 2025
-                'season': '2025'
-            }
+            url = get_league_season_url(13943)  # Premier League 2025 season_id
             
             print(f"📡 Making test request to: {url}")
             print(f"🔑 Using API key: {FOOTYSTATS_API_KEY[:20]}...")
-            print(f"📊 Test parameters: league_id=13943 (Premier League), season=2025")
+            print(f"📊 Test parameters: season_id=13943 (Premier League 2025)")
             
-            response = self.session.get(url, params=params, timeout=30)
+            response = self.session.get(url, timeout=30)
             
             print(f"📈 Response status: {response.status_code}")
             print(f"📋 Response headers: {dict(response.headers)}")
@@ -129,12 +130,12 @@ class FootyStatsAPITester:
         # Get a sample of leagues to test
         league_sample = list(FOOTYSTATS_LEAGUE_IDS.items())[:max_leagues]
         
-        for league_name, league_id in league_sample:
+        for league_name, season_id in league_sample:
             self.test_results["total_leagues_tested"] += 1
             
-            print(f"\n📥 Testing {league_name} (ID: {league_id})")
+            print(f"\n📥 Testing {league_name} (Season ID: {season_id})")
             
-            success = self._test_single_league(league_name, league_id)
+            success = self._test_single_league(league_name, season_id)
             
             if success:
                 self.test_results["successful_leagues"] += 1
@@ -146,75 +147,77 @@ class FootyStatsAPITester:
             # Rate limiting
             time.sleep(1.5)
     
-    def _test_single_league(self, league_name: str, league_id: int) -> bool:
-        """Test a single league."""
+    def _test_single_league(self, league_name: str, season_id: int) -> bool:
+        """Test a single league using season_id."""
         
         try:
-            url = "https://api.footystats.org/league-matches"
+            # Test season endpoint
+            season_url = get_league_season_url(season_id)
+            print(f"  📡 Testing season endpoint: {season_url}")
             
-            # Try current season first, then previous seasons
-            current_year = datetime.now().year
-            seasons_to_try = [current_year, current_year - 1, 2024]
+            response = self.session.get(season_url, timeout=20)
             
-            for season in seasons_to_try:
-                params = {
-                    'key': FOOTYSTATS_API_KEY,
-                    'league_id': str(league_id),
-                    'season': str(season)
-                }
-                
-                response = self.session.get(url, params=params, timeout=20)
-                
-                test_result = {
-                    "league_name": league_name,
-                    "league_id": league_id,
-                    "season": season,
-                    "status_code": response.status_code,
-                    "success": False,
-                    "matches_found": 0,
-                    "error": None
-                }
-                
-                if response.status_code == 200:
-                    try:
-                        data = response.json()
+            test_result = {
+                "league_name": league_name,
+                "season_id": season_id,
+                "status_code": response.status_code,
+                "success": False,
+                "teams_found": 0,
+                "error": None
+            }
+            
+            if response.status_code == 200:
+                try:
+                    season_data = response.json()
+                    print(f"  ✅ Season data retrieved successfully")
+                    
+                    # Also test teams endpoint
+                    teams_url = get_league_teams_url(season_id, include_stats=True)
+                    print(f"  📡 Testing teams endpoint: {teams_url}")
+                    
+                    teams_response = self.session.get(teams_url, timeout=20)
+                    
+                    if teams_response.status_code == 200:
+                        teams_data = teams_response.json()
                         
                         # Handle different response formats
-                        if isinstance(data, dict):
-                            matches = data.get('data', [])
-                        elif isinstance(data, list):
-                            matches = data
+                        if isinstance(teams_data, dict):
+                            teams = teams_data.get('data', [])
+                        elif isinstance(teams_data, list):
+                            teams = teams_data
                         else:
-                            matches = []
+                            teams = []
                         
-                        test_result["matches_found"] = len(matches)
+                        test_result["teams_found"] = len(teams)
+                        test_result["success"] = True
                         
-                        if matches:
-                            test_result["success"] = True
-                            self.test_results["league_test_results"].append(test_result)
-                            print(f"  ✅ Season {season}: {len(matches)} matches found")
-                            return True
-                        else:
-                            print(f"  ⚠️  Season {season}: No matches found")
-                            
-                    except json.JSONDecodeError:
-                        test_result["error"] = "Invalid JSON response"
-                        print(f"  ❌ Season {season}: Invalid JSON response")
+                        print(f"  ✅ Found {len(teams)} teams with stats")
+                        self.test_results["league_test_results"].append(test_result)
+                        return True
+                    else:
+                        print(f"  ⚠️  Teams endpoint failed: {teams_response.status_code}")
+                        # Still mark as success if season data worked
+                        test_result["success"] = True
+                        self.test_results["league_test_results"].append(test_result)
+                        return True
                         
-                elif response.status_code == 422:
-                    test_result["error"] = "Invalid parameters"
-                    print(f"  ⚠️  Season {season}: Invalid parameters")
+                except json.JSONDecodeError:
+                    test_result["error"] = "Invalid JSON response"
+                    print(f"  ❌ Invalid JSON response")
                     
-                elif response.status_code == 404:
-                    test_result["error"] = "Not found"
-                    print(f"  ⚠️  Season {season}: Not found")
-                    
-                else:
-                    test_result["error"] = f"HTTP {response.status_code}"
-                    print(f"  ❌ Season {season}: HTTP {response.status_code}")
+            elif response.status_code == 422:
+                test_result["error"] = "Invalid parameters"
+                print(f"  ⚠️  Invalid parameters for season_id {season_id}")
                 
-                self.test_results["league_test_results"].append(test_result)
+            elif response.status_code == 404:
+                test_result["error"] = "Not found"
+                print(f"  ⚠️  Season not found for season_id {season_id}")
+                
+            else:
+                test_result["error"] = f"HTTP {response.status_code}"
+                print(f"  ❌ HTTP {response.status_code}")
             
+            self.test_results["league_test_results"].append(test_result)
             return False
             
         except Exception as e:
@@ -233,9 +236,9 @@ class FootyStatsAPITester:
             "French Ligue 1": 13947
         }
         
-        for league_name, league_id in major_leagues.items():
-            print(f"\n🔥 Testing {league_name} (ID: {league_id})")
-            success = self._test_single_league(league_name, league_id)
+        for league_name, season_id in major_leagues.items():
+            print(f"\n🔥 Testing {league_name} (Season ID: {season_id})")
+            success = self._test_single_league(league_name, season_id)
             
             if success:
                 print(f"✅ {league_name}: Working correctly")

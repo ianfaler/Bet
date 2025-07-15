@@ -504,21 +504,28 @@ def fetch_mlb_stats(date: str = None) -> Dict[str, Any]:
         }
     }
 
-def fetch_soccer_stats(date: str = None, league_id: int = None) -> Dict[str, Any]:
-    """Fetch soccer stats from FootyStats API using correct 2025 league IDs."""
-    from footystats_config import FOOTYSTATS_API_KEY
+def fetch_soccer_stats(date: str = None, season_id: int = None) -> Dict[str, Any]:
+    """Fetch soccer stats from FootyStats API using correct API structure."""
+    from footystats_config import get_league_teams_url, get_league_season_url
     
-    url = 'https://api.footystats.org/league-matches'
-    params = {
-        'key': FOOTYSTATS_API_KEY,
-        'league_id': str(league_id or 13943),  # Default to Premier League
-        'season': str(datetime.now().year)
+    # Use season_id instead of league_id (default to Premier League)
+    season_id = season_id or 13943
+    
+    # Try to get teams data with stats first
+    teams_url = get_league_teams_url(season_id, include_stats=True)
+    teams_data = fetch_json(teams_url)
+    
+    # Also get season info
+    season_url = get_league_season_url(season_id)
+    season_data = fetch_json(season_url)
+    
+    # Combine the data
+    combined_data = {
+        'season_info': season_data,
+        'teams': teams_data
     }
     
-    if date:
-        params['date'] = date
-    
-    data = fetch_json(url, params=params)
+    data = combined_data
     
     # Return sample structure if API fails
     if not data:
