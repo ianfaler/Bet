@@ -504,13 +504,19 @@ def fetch_mlb_stats(date: str = None) -> Dict[str, Any]:
         }
     }
 
-def fetch_soccer_stats(date: str = None) -> Dict[str, Any]:
-    """Fetch soccer stats from FootyStats API."""
+def fetch_soccer_stats(date: str = None, league_id: int = None) -> Dict[str, Any]:
+    """Fetch soccer stats from FootyStats API using correct 2025 league IDs."""
+    from footystats_config import FOOTYSTATS_API_KEY
+    
     url = 'https://api.footystats.org/league-matches'
     params = {
-        'key': FOOTBALL_DATA_KEY,  # Using Football-Data key for now
-        'date': date or datetime.now().strftime('%Y-%m-%d')
+        'key': FOOTYSTATS_API_KEY,
+        'league_id': str(league_id or 13943),  # Default to Premier League
+        'season': str(datetime.now().year)
     }
+    
+    if date:
+        params['date'] = date
     
     data = fetch_json(url, params=params)
     

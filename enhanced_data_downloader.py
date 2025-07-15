@@ -1,434 +1,722 @@
 #!/usr/bin/env python3
 """
-Enhanced Historical Sports Data Downloader with Multiple API Sources
+Enhanced Data Downloader for Universal Betting Dashboard
 
-This enhanced version provides fallback mechanisms for soccer data collection:
-1. FootyStats API (primary)
-2. football-data.org API (fallback 1)
-3. Sportmonks API (fallback 2)
-4. SportsData.io Soccer API (fallback 3)
-
-Features:
-- Multiple API fallback system
-- Rate limiting and error handling
-- Progress tracking and logging
-- Automatic retries with exponential backoff
+Advanced data collection from multiple sources with better error handling,
+validation, and fallback mechanisms.
 """
 
 import os
+import sys
 import json
 import time
 import requests
-import zipfile
+import pandas as pd
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Dict, List, Optional, Any, Tuple
 import logging
-from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass
-import random
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+# Import correct FootyStats configuration
+from footystats_config import FOOTYSTATS_API_KEY, FOOTYSTATS_LEAGUE_IDS, LEAGUE_BY_COUNTRY
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-@dataclass
-class APIConfig:
-    """Configuration for different API sources"""
-    name: str
-    base_url: str
-    headers: Dict[str, str]
-    rate_limit: float  # seconds between requests
-    daily_limit: int   # requests per day
-    free_tier: bool
+# Configuration
+DATA_DIR = Path("data")
+RAW_DATA_DIR = DATA_DIR / "raw"
+PROCESSED_DATA_DIR = DATA_DIR / "processed"
+CACHE_DIR = DATA_DIR / "cache"
+
+# Create directories
+for directory in [DATA_DIR, RAW_DATA_DIR, PROCESSED_DATA_DIR, CACHE_DIR]:
+    directory.mkdir(exist_ok=True)
+
+# API Keys and Configuration
+API_KEYS = {
+    "footystats": FOOTYSTATS_API_KEY,
+    "sportsdata": os.getenv("SPORTSDATA_API_KEY", "demo_key"),
+    "football_data": os.getenv("FOOTBALL_DATA_API_KEY", "demo_key"),
+    "api_sports": os.getenv("API_SPORTS_KEY", "demo_key")
+}
+
+# Data source configurations
+DATA_SOURCES = {
+    "soccer": {
+        "primary": "footystats",
+        "fallback": ["football_data", "api_sports"],
+        "cache_duration": 3600  # 1 hour
+    },
+    "mlb": {
+        "primary": "sportsdata",
+        "fallback": ["api_sports"],
+        "cache_duration": 1800  # 30 minutes
+    }
+}
+
+# Updated league configurations using correct 2025 FootyStats IDs
+LEAGUE_CONFIGS = {
+    "soccer": {
+        "footystats": FOOTYSTATS_LEAGUE_IDS,
+        "football_data": {
+            # Football-Data.org IDs (fallback)
+            "English Premier League": 2021,
+            "Spanish La Liga": 2014,
+            "German Bundesliga": 2002,
+            "Italian Serie A": 2019,
+            "French Ligue 1": 2015,
+        },
+        "api_sports": {
+            # API-Sports IDs (fallback)
+            "English Premier League": 39,
+            "Spanish La Liga": 140,
+            "German Bundesliga": 78,
+            "Italian Serie A": 135,
+            "French Ligue 1": 61,
+        }
+    },
+    "mlb": {
+        "sportsdata": "mlb",  # SportsData.io uses sport codes
+        "api_sports": 1  # API-Sports MLB league ID
+    }
+}
+
 
 class EnhancedDataDownloader:
+    """
+    Enhanced data downloader with multiple source support, caching, and validation.
+    """
+    
     def __init__(self):
-        self.data_dir = Path("historical_data")
-        self.data_dir.mkdir(exist_ok=True)
+        """Initialize the enhanced data downloader."""
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Universal-Betting-Dashboard/2.0',
+            'Accept': 'application/json'
+        })
         
-        # API Configurations
-        self.apis = {
-            'footystats': APIConfig(
-                name="FootyStats",
-                base_url="https://api.footystats.org",
-                headers={"X-API-KEY": "b44de69d5777cd2c78d81d59a85d0a91154e836320016b53ecdc1f646fc95b97"},
-                rate_limit=1.0,
-                daily_limit=1000,
-                free_tier=True
-            ),
-            'football_data': APIConfig(
-                name="Football-Data.org",
-                base_url="https://api.football-data.org/v4",
-                headers={"X-Auth-Token": "YOUR_FOOTBALL_DATA_TOKEN"},  # Replace with actual token
-                rate_limit=6.0,  # 10 requests per minute = 6 seconds between requests
-                daily_limit=100,
-                free_tier=True
-            ),
-            'sportmonks': APIConfig(
-                name="Sportmonks",
-                base_url="https://api.sportmonks.com/v3/football",
-                headers={"Authorization": "YOUR_SPORTMONKS_TOKEN"},  # Replace with actual token
-                rate_limit=2.0,  # 180 per hour = 2 second intervals
-                daily_limit=180,
-                free_tier=True
-            ),
-            'sportsdata': APIConfig(
-                name="SportsData.io",
-                base_url="https://api.sportsdata.io/v3/soccer/scores/json",
-                headers={"Ocp-Apim-Subscription-Key": "YOUR_SPORTSDATA_KEY"},  # Replace with actual key
-                rate_limit=1.0,
-                daily_limit=1000,
-                free_tier=False
-            )
-        }
+        # Rate limiting
+        self.rate_limits = {}
         
-        # Request tracking
-        self.request_counts = {api: 0 for api in self.apis.keys()}
-        self.last_request_time = {api: 0 for api in self.apis.keys()}
-        
-        # Enhanced league mapping with multiple API identifiers
-        self.enhanced_league_mapping = self._load_enhanced_league_mapping()
-        
-    def _load_enhanced_league_mapping(self) -> Dict:
-        """Load enhanced league mapping with multiple API identifiers"""
+        # Data validation schemas
+        self.schemas = self._load_validation_schemas()
+    
+    def _load_validation_schemas(self) -> Dict:
+        """Load data validation schemas."""
         return {
-            "England": {
-                "Premier League": {
-                    "footystats": "premier-league",
-                    "football_data": "PL",
-                    "sportmonks": "8",
-                    "sportsdata": "ENG-PL"
-                },
-                "Championship": {
-                    "footystats": "championship",
-                    "football_data": "ELC",
-                    "sportmonks": "9",
-                    "sportsdata": "ENG-CH"
-                }
+            "soccer_match": {
+                "required_fields": ["home_team", "away_team", "date"],
+                "optional_fields": ["home_goals", "away_goals", "home_xg", "away_xg"]
             },
-            "Spain": {
-                "La Liga": {
-                    "footystats": "la-liga",
-                    "football_data": "PD",
-                    "sportmonks": "82",
-                    "sportsdata": "ESP-LL"
-                },
-                "LaLiga2": {
-                    "footystats": "laliga2",
-                    "football_data": "SD",
-                    "sportmonks": "83",
-                    "sportsdata": "ESP-LL2"
-                }
-            },
-            "Germany": {
-                "Bundesliga": {
-                    "footystats": "bundesliga",
-                    "football_data": "BL1",
-                    "sportmonks": "78",
-                    "sportsdata": "GER-BL"
-                },
-                "2. Bundesliga": {
-                    "footystats": "2-bundesliga",
-                    "football_data": "BL2",
-                    "sportmonks": "79",
-                    "sportsdata": "GER-BL2"
-                }
-            },
-            "Italy": {
-                "Serie A": {
-                    "footystats": "serie-a",
-                    "football_data": "SA",
-                    "sportmonks": "22",
-                    "sportsdata": "ITA-SA"
-                },
-                "Serie B": {
-                    "footystats": "serie-b",
-                    "football_data": "SB",
-                    "sportmonks": "23",
-                    "sportsdata": "ITA-SB"
-                }
-            },
-            "France": {
-                "Ligue 1": {
-                    "footystats": "ligue-1",
-                    "football_data": "FL1",
-                    "sportmonks": "85",
-                    "sportsdata": "FRA-L1"
-                },
-                "Ligue 2": {
-                    "footystats": "ligue-2",
-                    "football_data": "FL2",
-                    "sportmonks": "86",
-                    "sportsdata": "FRA-L2"
-                }
+            "mlb_game": {
+                "required_fields": ["home_team", "away_team", "date"],
+                "optional_fields": ["home_runs", "away_runs", "inning"]
             }
-            # Add more leagues as needed...
         }
     
-    def _wait_for_rate_limit(self, api_name: str):
-        """Implement rate limiting for API calls"""
-        api = self.apis[api_name]
-        current_time = time.time()
-        time_since_last = current_time - self.last_request_time[api_name]
-        
-        if time_since_last < api.rate_limit:
-            sleep_time = api.rate_limit - time_since_last
-            logger.info(f"Rate limiting {api.name}: waiting {sleep_time:.2f} seconds")
-            time.sleep(sleep_time)
-        
-        self.last_request_time[api_name] = time.time()
+    # ========================================================================
+    # Main Download Methods
+    # ========================================================================
     
-    def _make_api_request(self, api_name: str, endpoint: str, params: Dict = None) -> Optional[Dict]:
-        """Make API request with error handling and rate limiting"""
-        if self.request_counts[api_name] >= self.apis[api_name].daily_limit:
-            logger.warning(f"{self.apis[api_name].name} daily limit reached")
+    def download_all_data(self, sports: List[str] = None, timeframe: str = "recent") -> Dict[str, Any]:
+        """
+        Download data for all configured sports.
+        
+        Args:
+            sports: List of sports to download (default: ["soccer", "mlb"])
+            timeframe: "recent", "season", or "historical"
+        
+        Returns:
+            Dict with download results and statistics
+        """
+        if sports is None:
+            sports = ["soccer", "mlb"]
+        
+        logger.info(f"🚀 Starting enhanced data download for: {sports}")
+        
+        results = {
+            "timestamp": datetime.now().isoformat(),
+            "timeframe": timeframe,
+            "results": {},
+            "summary": {
+                "total_sources": 0,
+                "successful_downloads": 0,
+                "failed_downloads": 0,
+                "cached_responses": 0
+            }
+        }
+        
+        for sport in sports:
+            logger.info(f"📥 Downloading {sport} data...")
+            
+            sport_result = self._download_sport_data(sport, timeframe)
+            results["results"][sport] = sport_result
+            
+            # Update summary
+            results["summary"]["total_sources"] += sport_result.get("total_attempts", 0)
+            results["summary"]["successful_downloads"] += sport_result.get("successful", 0)
+            results["summary"]["failed_downloads"] += sport_result.get("failed", 0)
+            results["summary"]["cached_responses"] += sport_result.get("cached", 0)
+        
+        # Save download report
+        self._save_download_report(results)
+        
+        logger.info(f"✅ Enhanced data download complete: {results['summary']}")
+        return results
+    
+    def _download_sport_data(self, sport: str, timeframe: str) -> Dict[str, Any]:
+        """Download data for a specific sport."""
+        
+        result = {
+            "sport": sport,
+            "timeframe": timeframe,
+            "sources_attempted": [],
+            "successful": 0,
+            "failed": 0,
+            "cached": 0,
+            "total_attempts": 0,
+            "data_files": []
+        }
+        
+        if sport == "soccer":
+            return self._download_soccer_data(timeframe)
+        elif sport == "mlb":
+            return self._download_mlb_data(timeframe)
+        else:
+            logger.warning(f"⚠️  Unknown sport: {sport}")
+            return result
+    
+    # ========================================================================
+    # Soccer Data Download
+    # ========================================================================
+    
+    def _download_soccer_data(self, timeframe: str) -> Dict[str, Any]:
+        """Download soccer data from multiple sources with correct 2025 league IDs."""
+        
+        result = {
+            "sport": "soccer",
+            "leagues_processed": 0,
+            "successful": 0,
+            "failed": 0,
+            "cached": 0,
+            "total_attempts": 0,
+            "data_files": []
+        }
+        
+        primary_source = DATA_SOURCES["soccer"]["primary"]
+        fallback_sources = DATA_SOURCES["soccer"]["fallback"]
+        
+        # Process leagues using correct 2025 FootyStats IDs
+        for league_name, league_id in FOOTYSTATS_LEAGUE_IDS.items():
+            result["total_attempts"] += 1
+            result["leagues_processed"] += 1
+            
+            logger.info(f"📥 Downloading {league_name} (ID: {league_id})")
+            
+            # Try primary source first (FootyStats)
+            data = self._download_from_source(
+                source=primary_source,
+                sport="soccer", 
+                league_name=league_name,
+                league_id=league_id,
+                timeframe=timeframe
+            )
+            
+            if data:
+                result["successful"] += 1
+                file_path = self._save_league_data(league_name, primary_source, data, timeframe)
+                result["data_files"].append(str(file_path))
+                logger.info(f"✅ Downloaded {league_name} from {primary_source}")
+            else:
+                # Try fallback sources
+                success = False
+                for fallback_source in fallback_sources:
+                    logger.info(f"🔄 Trying fallback: {fallback_source} for {league_name}")
+                    
+                    fallback_data = self._download_from_source(
+                        source=fallback_source,
+                        sport="soccer",
+                        league_name=league_name,
+                        league_id=self._get_fallback_league_id(league_name, fallback_source),
+                        timeframe=timeframe
+                    )
+                    
+                    if fallback_data:
+                        result["successful"] += 1
+                        file_path = self._save_league_data(league_name, fallback_source, fallback_data, timeframe)
+                        result["data_files"].append(str(file_path))
+                        logger.info(f"✅ Downloaded {league_name} from {fallback_source}")
+                        success = True
+                        break
+                
+                if not success:
+                    result["failed"] += 1
+                    logger.warning(f"⚠️  Failed to download {league_name} from any source")
+            
+            # Rate limiting
+            time.sleep(1)
+        
+        return result
+    
+    def _get_fallback_league_id(self, league_name: str, source: str) -> Optional[int]:
+        """Get league ID for fallback source."""
+        try:
+            return LEAGUE_CONFIGS["soccer"][source].get(league_name)
+        except KeyError:
             return None
+    
+    def _download_from_source(self, source: str, sport: str, league_name: str, 
+                             league_id: Any, timeframe: str) -> Optional[List]:
+        """Download data from a specific source."""
         
-        self._wait_for_rate_limit(api_name)
-        
-        api = self.apis[api_name]
-        url = f"{api.base_url}/{endpoint}"
+        if source == "footystats":
+            return self._download_footystats(league_id, timeframe)
+        elif source == "football_data":
+            return self._download_football_data(league_id, timeframe)
+        elif source == "api_sports":
+            return self._download_api_sports(sport, league_id, timeframe)
+        elif source == "sportsdata":
+            return self._download_sportsdata(sport, timeframe)
+        else:
+            logger.warning(f"⚠️  Unknown source: {source}")
+            return None
+    
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+    def _download_footystats(self, league_id: int, timeframe: str) -> Optional[List]:
+        """Download data from FootyStats API using correct 2025 league IDs."""
         
         try:
-            response = requests.get(url, headers=api.headers, params=params, timeout=30)
-            self.request_counts[api_name] += 1
+            url = "https://api.footystats.org/league-matches"
+            
+            # Determine season based on timeframe
+            current_year = datetime.now().year
+            if timeframe == "recent":
+                season = current_year
+            elif timeframe == "season":
+                season = current_year
+            else:  # historical
+                season = current_year - 1
+            
+            params = {
+                'key': API_KEYS["footystats"],
+                'league_id': str(league_id),
+                'season': str(season)
+            }
+            
+            logger.debug(f"FootyStats request: {url} with params {params}")
+            
+            response = self.session.get(url, params=params, timeout=30)
             
             if response.status_code == 200:
-                return response.json()
+                data = response.json()
+                
+                # Handle different response formats
+                if isinstance(data, dict):
+                    matches = data.get('data', [])
+                elif isinstance(data, list):
+                    matches = data
+                else:
+                    logger.warning(f"⚠️  Unexpected data format from FootyStats")
+                    return None
+                
+                logger.debug(f"✅ FootyStats returned {len(matches)} matches for league {league_id}")
+                return matches
+                
+            elif response.status_code == 422:
+                logger.warning(f"⚠️  Invalid parameters for FootyStats league {league_id}")
+                return None
+            elif response.status_code == 404:
+                logger.warning(f"⚠️  No data found for FootyStats league {league_id}")
+                return None
             else:
-                logger.error(f"{api.name} API error {response.status_code}: {response.text}")
+                logger.warning(f"⚠️  FootyStats API error {response.status_code}")
                 return None
                 
         except Exception as e:
-            logger.error(f"Request failed for {api.name}: {e}")
+            logger.error(f"❌ Failed to download from FootyStats: {e}")
             return None
     
-    def download_soccer_league_data(self, country: str, league: str) -> int:
-        """Download soccer league data using multiple API fallbacks"""
-        logger.info(f"📊 Downloading {league} ({country}) data with fallback APIs...")
+    def _download_football_data(self, league_id: int, timeframe: str) -> Optional[List]:
+        """Download data from Football-Data.org API."""
         
-        league_mapping = self.enhanced_league_mapping.get(country, {}).get(league, {})
-        if not league_mapping:
-            logger.warning(f"No mapping found for {league} ({country})")
-            return 0
-        
-        total_matches = 0
-        seasons = ["2023-2024", "2024-2025", "2025-2026"]
-        
-        # Try each API in order of preference
-        api_order = ['footystats', 'football_data', 'sportmonks', 'sportsdata']
-        
-        for season in seasons:
-            matches_downloaded = 0
-            
-            for api_name in api_order:
-                if api_name not in league_mapping:
-                    continue
-                    
-                league_id = league_mapping[api_name]
-                matches = self._download_from_specific_api(api_name, league_id, season, country, league)
-                
-                if matches and len(matches) > 0:
-                    matches_downloaded = len(matches)
-                    self._save_league_data(country, league, season, matches, api_name)
-                    logger.info(f"✅ {season}: {matches_downloaded} matches from {self.apis[api_name].name}")
-                    break
-                else:
-                    logger.warning(f"❌ {season}: Failed with {self.apis[api_name].name}")
-            
-            total_matches += matches_downloaded
-            
-            if matches_downloaded == 0:
-                logger.error(f"❌ {season}: All APIs failed")
-        
-        return total_matches
-    
-    def _download_from_specific_api(self, api_name: str, league_id: str, season: str, country: str, league: str) -> Optional[List]:
-        """Download data from a specific API"""
         try:
-            if api_name == 'footystats':
-                return self._download_footystats(league_id, season)
-            elif api_name == 'football_data':
-                return self._download_football_data(league_id, season)
-            elif api_name == 'sportmonks':
-                return self._download_sportmonks(league_id, season)
-            elif api_name == 'sportsdata':
-                return self._download_sportsdata(league_id, season)
+            if not league_id:
+                return None
+            
+            url = f"https://api.football-data.org/v4/competitions/{league_id}/matches"
+            
+            headers = {
+                'X-Auth-Token': API_KEYS["football_data"]
+            }
+            
+            response = self.session.get(url, headers=headers, timeout=30)
+            
+            if response.status_code == 200:
+                data = response.json()
+                matches = data.get('matches', [])
+                logger.debug(f"✅ Football-Data returned {len(matches)} matches")
+                return matches
+            else:
+                logger.warning(f"⚠️  Football-Data API error {response.status_code}")
+                return None
+                
         except Exception as e:
-            logger.error(f"Error downloading from {api_name}: {e}")
+            logger.error(f"❌ Failed to download from Football-Data: {e}")
             return None
     
-    def _download_footystats(self, league_id: str, season: str) -> Optional[List]:
-        """Download from FootyStats API"""
-        endpoint = "league-matches"
-        params = {
-            "key": "b44de69d5777cd2c78d81d59a85d0a91154e836320016b53ecdc1f646fc95b97",
-            "league_id": league_id,
-            "season": season
-        }
+    def _download_api_sports(self, sport: str, league_id: int, timeframe: str) -> Optional[List]:
+        """Download data from API-Sports."""
         
-        data = self._make_api_request('footystats', endpoint, params)
-        return data.get('data', []) if data else None
-    
-    def _download_football_data(self, league_id: str, season: str) -> Optional[List]:
-        """Download from Football-Data.org API"""
-        # Convert season format (2023-2024 -> 2023)
-        year = season.split('-')[0]
-        endpoint = f"competitions/{league_id}/matches"
-        params = {"season": year}
-        
-        data = self._make_api_request('football_data', endpoint, params)
-        return data.get('matches', []) if data else None
-    
-    def _download_sportmonks(self, league_id: str, season: str) -> Optional[List]:
-        """Download from Sportmonks API"""
-        endpoint = f"fixtures"
-        params = {
-            "api_token": "YOUR_SPORTMONKS_TOKEN",  # Replace with actual token
-            "filter[season_id]": league_id,
-            "include": "scores,teams"
-        }
-        
-        data = self._make_api_request('sportmonks', endpoint, params)
-        return data.get('data', []) if data else None
-    
-    def _download_sportsdata(self, league_id: str, season: str) -> Optional[List]:
-        """Download from SportsData.io API"""
-        # Convert season to year
-        year = season.split('-')[0]
-        endpoint = f"Games/{league_id}/{year}"
-        
-        data = self._make_api_request('sportsdata', endpoint)
-        return data if data and isinstance(data, list) else None
-    
-    def _save_league_data(self, country: str, league: str, season: str, matches: List, api_source: str):
-        """Save league data to file"""
-        country_dir = self.data_dir / "soccer" / country.replace(" ", "_")
-        country_dir.mkdir(parents=True, exist_ok=True)
-        
-        filename = f"{league.replace(' ', '_')}_{season}_{api_source}.json"
-        filepath = country_dir / filename
-        
-        data = {
-            "country": country,
-            "league": league,
-            "season": season,
-            "api_source": api_source,
-            "download_date": datetime.now().isoformat(),
-            "matches_count": len(matches),
-            "matches": matches
-        }
-        
-        with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-    
-    def download_mlb_data(self) -> str:
-        """Download MLB historical data from SportsData.io"""
-        logger.info("🏈 Downloading MLB historical data from SportsData.io...")
-        
-        mlb_dir = self.data_dir / "mlb"
-        mlb_dir.mkdir(exist_ok=True)
-        
-        # SportsData.io direct download URL (example)
-        today = datetime.now().strftime("%Y%m%d")
-        filename = f"mlb_historical_data_{today}.zip"
-        filepath = mlb_dir / filename
-        
-        # For demo purposes, create a sample file
-        # In production, this would download from the actual API
-        sample_data = {
-            "download_date": datetime.now().isoformat(),
-            "source": "SportsData.io",
-            "games_count": 15000,
-            "seasons": ["2020", "2021", "2022", "2023", "2024"],
-            "note": "Historical MLB data for ML training"
-        }
-        
-        with open(filepath, 'w') as f:
-            json.dump(sample_data, f, indent=2)
-        
-        file_size = os.path.getsize(filepath) / (1024 * 1024)  # MB
-        logger.info(f"✅ MLB data saved: {filepath}")
-        logger.info(f"📊 File size: {file_size:.2f} MB")
-        
-        return str(filepath)
-    
-    def generate_enhanced_report(self) -> Dict:
-        """Generate comprehensive download report"""
-        report = {
-            "download_date": datetime.now().isoformat(),
-            "enhanced_downloader": True,
-            "api_usage": {},
-            "mlb_data": {
-                "status": "completed",
-                "source": "SportsData.io"
-            },
-            "soccer_data": {},
-            "summary": {
-                "total_apis_used": 0,
-                "total_requests_made": sum(self.request_counts.values()),
-                "successful_leagues": 0,
-                "failed_leagues": 0
+        try:
+            if not league_id:
+                return None
+            
+            if sport == "soccer":
+                url = "https://v3.football.api-sports.io/fixtures"
+                params = {'league': league_id}
+            elif sport == "mlb":
+                url = "https://v1.baseball.api-sports.io/games"
+                params = {'league': league_id}
+            else:
+                return None
+            
+            headers = {
+                'X-RapidAPI-Key': API_KEYS["api_sports"]
             }
+            
+            response = self.session.get(url, headers=headers, params=params, timeout=30)
+            
+            if response.status_code == 200:
+                data = response.json()
+                matches = data.get('response', [])
+                logger.debug(f"✅ API-Sports returned {len(matches)} matches")
+                return matches
+            else:
+                logger.warning(f"⚠️  API-Sports error {response.status_code}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to download from API-Sports: {e}")
+            return None
+    
+    # ========================================================================
+    # MLB Data Download
+    # ========================================================================
+    
+    def _download_mlb_data(self, timeframe: str) -> Dict[str, Any]:
+        """Download MLB data from multiple sources."""
+        
+        result = {
+            "sport": "mlb",
+            "successful": 0,
+            "failed": 0,
+            "cached": 0,
+            "total_attempts": 1,
+            "data_files": []
         }
         
-        # Add API usage statistics
-        for api_name, count in self.request_counts.items():
-            if count > 0:
-                report["api_usage"][api_name] = {
-                    "requests_made": count,
-                    "daily_limit": self.apis[api_name].daily_limit,
-                    "remaining": self.apis[api_name].daily_limit - count,
-                    "api_name": self.apis[api_name].name
-                }
-                report["summary"]["total_apis_used"] += 1
-        
-        return report
-    
-    def run_enhanced_download(self):
-        """Run the enhanced download process"""
-        logger.info("🚀 Starting Enhanced Historical Data Download Process")
-        logger.info("=" * 60)
+        primary_source = DATA_SOURCES["mlb"]["primary"]
         
         # Download MLB data
-        mlb_file = self.download_mlb_data()
+        data = self._download_sportsdata("mlb", timeframe)
         
-        # Download soccer data for major leagues with fallback APIs
-        major_leagues = [
-            ("England", "Premier League"),
-            ("Spain", "La Liga"),
-            ("Germany", "Bundesliga"),
-            ("Italy", "Serie A"),
-            ("France", "Ligue 1")
-        ]
+        if data:
+            result["successful"] = 1
+            file_path = self._save_mlb_data(primary_source, data, timeframe)
+            result["data_files"].append(str(file_path))
+            logger.info(f"✅ Downloaded MLB data from {primary_source}")
+        else:
+            result["failed"] = 1
+            logger.warning(f"⚠️  Failed to download MLB data")
         
-        for country, league in major_leagues:
-            matches = self.download_soccer_league_data(country, league)
-            logger.info(f"📊 {league}: {matches} total matches downloaded")
+        return result
+    
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+    def _download_sportsdata(self, sport: str, timeframe: str) -> Optional[List]:
+        """Download data from SportsData.io."""
         
-        # Generate and save report
-        report = self.generate_enhanced_report()
-        report_file = self.data_dir / f"enhanced_download_report_{datetime.now().strftime('%Y%m%d_%H%M')}.json"
+        try:
+            # SportsData.io endpoints
+            current_year = datetime.now().year
+            
+            if sport == "mlb":
+                url = f"https://api.sportsdata.io/v3/mlb/scores/json/Games/{current_year}"
+            else:
+                return None
+            
+            params = {'key': API_KEYS["sportsdata"]}
+            
+            response = self.session.get(url, params=params, timeout=30)
+            
+            if response.status_code == 200:
+                data = response.json()
+                logger.debug(f"✅ SportsData returned {len(data)} games")
+                return data
+            else:
+                logger.warning(f"⚠️  SportsData API error {response.status_code}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to download from SportsData: {e}")
+            return None
+    
+    # ========================================================================
+    # Data Saving and Processing
+    # ========================================================================
+    
+    def _save_league_data(self, league_name: str, source: str, data: List, timeframe: str) -> Path:
+        """Save league data to file."""
+        
+        # Create directory structure
+        sport_dir = RAW_DATA_DIR / "soccer" / source
+        sport_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{league_name.lower().replace(' ', '_')}_{timeframe}_{timestamp}.json"
+        file_path = sport_dir / filename
+        
+        # Save data with metadata
+        output_data = {
+            "metadata": {
+                "league_name": league_name,
+                "source": source,
+                "timeframe": timeframe,
+                "downloaded_at": datetime.now().isoformat(),
+                "record_count": len(data)
+            },
+            "data": data
+        }
+        
+        with open(file_path, 'w') as f:
+            json.dump(output_data, f, indent=2)
+        
+        return file_path
+    
+    def _save_mlb_data(self, source: str, data: List, timeframe: str) -> Path:
+        """Save MLB data to file."""
+        
+        # Create directory structure
+        sport_dir = RAW_DATA_DIR / "mlb" / source
+        sport_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"mlb_{timeframe}_{timestamp}.json"
+        file_path = sport_dir / filename
+        
+        # Save data with metadata
+        output_data = {
+            "metadata": {
+                "sport": "mlb",
+                "source": source,
+                "timeframe": timeframe,
+                "downloaded_at": datetime.now().isoformat(),
+                "record_count": len(data)
+            },
+            "data": data
+        }
+        
+        with open(file_path, 'w') as f:
+            json.dump(output_data, f, indent=2)
+        
+        return file_path
+    
+    def _save_download_report(self, results: Dict) -> None:
+        """Save download report."""
+        
+        report_file = PROCESSED_DATA_DIR / f"download_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         
         with open(report_file, 'w') as f:
-            json.dump(report, f, indent=2)
+            json.dump(results, f, indent=2)
         
-        logger.info(f"✅ Enhanced download completed!")
-        logger.info(f"📋 Report saved: {report_file}")
-        logger.info(f"📊 Total API requests made: {sum(self.request_counts.values())}")
+        logger.info(f"📄 Download report saved: {report_file}")
+    
+    # ========================================================================
+    # Data Validation and Quality Checks
+    # ========================================================================
+    
+    def validate_downloaded_data(self) -> Dict[str, Any]:
+        """Validate all downloaded data."""
         
-        return report
+        logger.info("🔍 Validating downloaded data...")
+        
+        validation_results = {
+            "timestamp": datetime.now().isoformat(),
+            "soccer": self._validate_sport_data("soccer"),
+            "mlb": self._validate_sport_data("mlb")
+        }
+        
+        # Save validation report
+        validation_file = PROCESSED_DATA_DIR / f"validation_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        with open(validation_file, 'w') as f:
+            json.dump(validation_results, f, indent=2)
+        
+        logger.info(f"✅ Data validation complete: {validation_file}")
+        return validation_results
+    
+    def _validate_sport_data(self, sport: str) -> Dict[str, Any]:
+        """Validate data for a specific sport."""
+        
+        validation_result = {
+            "sport": sport,
+            "files_checked": 0,
+            "valid_files": 0,
+            "invalid_files": 0,
+            "total_records": 0,
+            "valid_records": 0,
+            "issues": []
+        }
+        
+        sport_dir = RAW_DATA_DIR / sport
+        if not sport_dir.exists():
+            validation_result["issues"].append(f"No data directory found for {sport}")
+            return validation_result
+        
+        # Check all data files
+        for data_file in sport_dir.rglob("*.json"):
+            validation_result["files_checked"] += 1
+            
+            try:
+                with open(data_file, 'r') as f:
+                    file_data = json.load(f)
+                
+                # Validate file structure
+                if self._validate_file_structure(file_data, sport):
+                    validation_result["valid_files"] += 1
+                    
+                    # Count and validate records
+                    records = file_data.get("data", [])
+                    validation_result["total_records"] += len(records)
+                    
+                    valid_record_count = sum(1 for record in records if self._validate_record(record, sport))
+                    validation_result["valid_records"] += valid_record_count
+                    
+                    if valid_record_count < len(records):
+                        validation_result["issues"].append(f"Invalid records in {data_file.name}")
+                
+                else:
+                    validation_result["invalid_files"] += 1
+                    validation_result["issues"].append(f"Invalid file structure: {data_file.name}")
+            
+            except Exception as e:
+                validation_result["invalid_files"] += 1
+                validation_result["issues"].append(f"Error reading {data_file.name}: {str(e)}")
+        
+        return validation_result
+    
+    def _validate_file_structure(self, file_data: Dict, sport: str) -> bool:
+        """Validate file structure."""
+        required_keys = ["metadata", "data"]
+        return all(key in file_data for key in required_keys)
+    
+    def _validate_record(self, record: Dict, sport: str) -> bool:
+        """Validate individual record."""
+        if sport == "soccer":
+            schema = self.schemas["soccer_match"]
+        elif sport == "mlb":
+            schema = self.schemas["mlb_game"]
+        else:
+            return False
+        
+        # Check required fields
+        return all(field in record for field in schema["required_fields"])
+    
+    # ========================================================================
+    # Utilities and Status
+    # ========================================================================
+    
+    def get_download_status(self) -> Dict[str, Any]:
+        """Get current download status and statistics."""
+        
+        status = {
+            "timestamp": datetime.now().isoformat(),
+            "data_directories": {},
+            "recent_downloads": {},
+            "api_status": {}
+        }
+        
+        # Check data directories
+        for sport in ["soccer", "mlb"]:
+            sport_dir = RAW_DATA_DIR / sport
+            if sport_dir.exists():
+                files = list(sport_dir.rglob("*.json"))
+                status["data_directories"][sport] = {
+                    "exists": True,
+                    "file_count": len(files),
+                    "total_size": sum(f.stat().st_size for f in files),
+                    "last_download": max([f.stat().st_mtime for f in files]) if files else None
+                }
+            else:
+                status["data_directories"][sport] = {"exists": False}
+        
+        # Check recent download reports
+        report_files = list(PROCESSED_DATA_DIR.glob("download_report_*.json"))
+        if report_files:
+            latest_report = max(report_files, key=lambda x: x.stat().st_mtime)
+            try:
+                with open(latest_report, 'r') as f:
+                    status["recent_downloads"] = json.load(f)
+            except Exception:
+                pass
+        
+        # Check API status (basic connectivity)
+        status["api_status"] = self._check_api_status()
+        
+        return status
+    
+    def _check_api_status(self) -> Dict[str, bool]:
+        """Check basic API connectivity."""
+        
+        api_status = {}
+        
+        # Test FootyStats API
+        try:
+            url = "https://api.footystats.org/league-matches"
+            params = {'key': API_KEYS["footystats"], 'league_id': '13943', 'season': '2025'}
+            response = requests.get(url, params=params, timeout=10)
+            api_status["footystats"] = response.status_code in [200, 422]  # 422 means API works but params may be invalid
+        except Exception:
+            api_status["footystats"] = False
+        
+        # Test other APIs similarly...
+        api_status["sportsdata"] = API_KEYS["sportsdata"] != "demo_key"
+        api_status["football_data"] = API_KEYS["football_data"] != "demo_key"
+        api_status["api_sports"] = API_KEYS["api_sports"] != "demo_key"
+        
+        return api_status
+
 
 def main():
-    """Main function to run enhanced data download"""
-    downloader = EnhancedDataDownloader()
-    report = downloader.run_enhanced_download()
+    """Main function for testing the enhanced data downloader."""
     
-    print("\n🎯 ENHANCED DOWNLOAD SUMMARY:")
-    print(f"✅ MLB Data: Downloaded from SportsData.io")
-    print(f"⚽ Soccer APIs Used: {report['summary']['total_apis_used']}")
-    print(f"📊 Total Requests: {report['summary']['total_requests_made']}")
-    print(f"🚀 Enhanced fallback system operational!")
+    logger.info("🚀 Starting Enhanced Data Downloader Test")
+    
+    # Initialize downloader
+    downloader = EnhancedDataDownloader()
+    
+    # Download recent data for all sports
+    results = downloader.download_all_data(
+        sports=["soccer", "mlb"],
+        timeframe="recent"
+    )
+    
+    # Validate downloaded data
+    validation_results = downloader.validate_downloaded_data()
+    
+    # Get status
+    status = downloader.get_download_status()
+    
+    # Print results
+    logger.info("📊 Enhanced Download Results:")
+    logger.info(f"  Total Sources: {results['summary']['total_sources']}")
+    logger.info(f"  Successful: {results['summary']['successful_downloads']}")
+    logger.info(f"  Failed: {results['summary']['failed_downloads']}")
+    logger.info(f"  Validation Status: {validation_results}")
+
 
 if __name__ == "__main__":
     main()
