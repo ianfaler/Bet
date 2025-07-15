@@ -38,7 +38,8 @@ warnings.filterwarnings('ignore')
 # Configuration and API keys
 # ---------------------------------------------------------------------------
 
-ODDS_API_KEY = os.getenv("ODDS_API_KEY", "871e9c60cff88aa471d084492fe66062")
+ODDS_API_KEY = os.getenv("ODDS_API_KEY", "f25b4597c8275546821c5d47a2f727eb")
+FOOTYSTATS_API_KEY = os.getenv("FOOTYSTATS_API_KEY", "b44de69d5777cd2c78d81d59a85d0a91154e836320016b53ecdc1f646fc95b97")
 APISPORTS_KEY = os.getenv("APISPORTS_KEY", "0002b89b
 Thought for 4s
 I see the issue! The main.py file is quite large (858 lines) and may have been truncated or hard to see. Let me break it down into manageable sections for you to copy-paste:
@@ -84,7 +85,8 @@ warnings.filterwarnings('ignore')
 # Configuration and API keys
 # ---------------------------------------------------------------------------
 
-ODDS_API_KEY = os.getenv("ODDS_API_KEY", "871e9c60cff88aa471d084492fe66062")
+ODDS_API_KEY = os.getenv("ODDS_API_KEY", "f25b4597c8275546821c5d47a2f727eb")
+FOOTYSTATS_API_KEY = os.getenv("FOOTYSTATS_API_KEY", "b44de69d5777cd2c78d81d59a85d0a91154e836320016b53ecdc1f646fc95b97")
 APISPORTS_KEY = os.getenv("APISPORTS_KEY", "0002b89b7e2b4bb110848c3aec142b96")
 FOOTBALL_DATA_KEY = os.getenv("FOOTBALL_DATA_KEY", "1976d5a0686f42d289b6d95f6365b702")
 THESPORTSDB_KEY = os.getenv("THESPORTSDB_KEY", "123")
@@ -212,7 +214,8 @@ warnings.filterwarnings('ignore')
 # Configuration and API keys
 # ---------------------------------------------------------------------------
 
-ODDS_API_KEY = os.getenv("ODDS_API_KEY", "871e9c60cff88aa471d084492fe66062")
+ODDS_API_KEY = os.getenv("ODDS_API_KEY", "f25b4597c8275546821c5d47a2f727eb")
+FOOTYSTATS_API_KEY = os.getenv("FOOTYSTATS_API_KEY", "b44de69d5777cd2c78d81d59a85d0a91154e836320016b53ecdc1f646fc95b97")
 APISPORTS_KEY = os.getenv("APISPORTS_KEY", "0002b89b7e2b4bb110848c3aec142b96")
 FOOTBALL_DATA_KEY = os.getenv("FOOTBALL_DATA_KEY", "1976d5a0686f42d289b6d95f6365b702")
 THESPORTSDB_KEY = os.getenv("THESPORTSDB_KEY", "123")
@@ -391,7 +394,8 @@ warnings.filterwarnings('ignore')
 # Configuration and API keys
 # ---------------------------------------------------------------------------
 
-ODDS_API_KEY = os.getenv("ODDS_API_KEY", "871e9c60cff88aa471d084492fe66062")
+ODDS_API_KEY = os.getenv("ODDS_API_KEY", "f25b4597c8275546821c5d47a2f727eb")
+FOOTYSTATS_API_KEY = os.getenv("FOOTYSTATS_API_KEY", "b44de69d5777cd2c78d81d59a85d0a91154e836320016b53ecdc1f646fc95b97")
 APISPORTS_KEY = os.getenv("APISPORTS_KEY", "0002b89b7e2b4bb110848c3aec142b96")
 FOOTBALL_DATA_KEY = os.getenv("FOOTBALL_DATA_KEY", "1976d5a0686f42d289b6d95f6365b702")
 THESPORTSDB_KEY = os.getenv("THESPORTSDB_KEY", "123")
