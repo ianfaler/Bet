@@ -13,6 +13,15 @@ import json
 import logging
 from datetime import datetime
 
+# Import data management and ML models
+try:
+    from data_manager import DataManager
+    from ml_models import MLModelManager
+    DATA_MANAGEMENT_AVAILABLE = True
+except ImportError:
+    DATA_MANAGEMENT_AVAILABLE = False
+    logging.warning("⚠️  Data management not available")
+
 # Initialize Flask app
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend integration
@@ -20,6 +29,14 @@ CORS(app)  # Enable CORS for frontend integration
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Initialize data management and ML models
+if DATA_MANAGEMENT_AVAILABLE:
+    data_manager = DataManager()
+    ml_manager = MLModelManager()
+else:
+    data_manager = None
+    ml_manager = None
 
 # HTML template for web interface
 HTML_TEMPLATE = """
@@ -367,6 +384,184 @@ def api_scan_raw():
             'error': str(e),
             'timestamp': datetime.utcnow().isoformat(),
             'status': 'failed'
+        }), 500
+
+# ============================================================================
+# Data Management API Endpoints
+# ============================================================================
+
+@app.route('/api/data/status')
+def api_data_status():
+    """Get status of historical data."""
+    try:
+        if not data_manager:
+            return jsonify({
+                'error': 'Data management not available',
+                'available': False
+            }), 503
+        
+        status = data_manager.get_data_status()
+        return jsonify(status)
+        
+    except Exception as e:
+        logger.error(f"Data status error: {e}")
+        return jsonify({
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat()
+        }), 500
+
+@app.route('/api/data/download', methods=['POST'])
+def api_data_download():
+    """Download historical data."""
+    try:
+        if not data_manager:
+            return jsonify({
+                'error': 'Data management not available',
+                'available': False
+            }), 503
+        
+        data_type = request.json.get('type', 'all')  # 'mlb', 'soccer', or 'all'
+        
+        results = {}
+        
+        if data_type in ['mlb', 'all']:
+            logger.info("Starting MLB data download...")
+            results['mlb'] = data_manager.download_mlb_historical_data()
+        
+        if data_type in ['soccer', 'all']:
+            logger.info("Starting soccer data download...")
+            results['soccer'] = data_manager.download_soccer_historical_data()
+        
+        return jsonify({
+            'status': 'completed',
+            'results': results,
+            'timestamp': datetime.utcnow().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Data download error: {e}")
+        return jsonify({
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat(),
+            'status': 'failed'
+        }), 500
+
+@app.route('/api/data/process', methods=['POST'])
+def api_data_process():
+    """Process historical data for ML models."""
+    try:
+        if not data_manager:
+            return jsonify({
+                'error': 'Data management not available',
+                'available': False
+            }), 503
+        
+        logger.info("Starting data processing...")
+        results = data_manager.process_all_data()
+        
+        return jsonify({
+            'status': 'completed',
+            'results': results,
+            'timestamp': datetime.utcnow().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Data processing error: {e}")
+        return jsonify({
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat(),
+            'status': 'failed'
+        }), 500
+
+# ============================================================================
+# ML Model API Endpoints
+# ============================================================================
+
+@app.route('/api/ml/status')
+def api_ml_status():
+    """Get status of ML models."""
+    try:
+        if not ml_manager:
+            return jsonify({
+                'error': 'ML models not available',
+                'available': False
+            }), 503
+        
+        status = ml_manager.get_model_status()
+        return jsonify(status)
+        
+    except Exception as e:
+        logger.error(f"ML status error: {e}")
+        return jsonify({
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat()
+        }), 500
+
+@app.route('/api/ml/train', methods=['POST'])
+def api_ml_train():
+    """Train ML models."""
+    try:
+        if not ml_manager:
+            return jsonify({
+                'error': 'ML models not available',
+                'available': False
+            }), 503
+        
+        logger.info("Starting ML model training...")
+        results = ml_manager.train_all_models()
+        
+        return jsonify({
+            'status': 'completed',
+            'results': results,
+            'timestamp': datetime.utcnow().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"ML training error: {e}")
+        return jsonify({
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat(),
+            'status': 'failed'
+        }), 500
+
+@app.route('/api/ml/predict', methods=['POST'])
+def api_ml_predict():
+    """Get ML prediction for a game."""
+    try:
+        if not ml_manager:
+            return jsonify({
+                'error': 'ML models not available',
+                'available': False
+            }), 503
+        
+        sport = request.json.get('sport', '').upper()
+        game_data = request.json.get('game_data', {})
+        
+        if not sport or not game_data:
+            return jsonify({
+                'error': 'Missing sport or game_data parameters',
+                'required': ['sport', 'game_data']
+            }), 400
+        
+        prediction = ml_manager.get_enhanced_prediction(sport, game_data)
+        
+        if prediction:
+            from dataclasses import asdict
+            return jsonify({
+                'prediction': asdict(prediction),
+                'timestamp': datetime.utcnow().isoformat()
+            })
+        else:
+            return jsonify({
+                'error': f'No trained model available for {sport}',
+                'timestamp': datetime.utcnow().isoformat()
+            }), 404
+        
+    except Exception as e:
+        logger.error(f"ML prediction error: {e}")
+        return jsonify({
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat()
         }), 500
 
 # Error handlers

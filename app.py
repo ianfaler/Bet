@@ -33,6 +33,15 @@ import requests
 from scipy import stats
 from tenacity import retry, stop_after_attempt, wait_fixed
 
+# Import ML models and data management
+try:
+    from ml_models import MLModelManager, ModelPrediction
+    from data_manager import DataManager
+    ML_ENHANCED = True
+except ImportError:
+    ML_ENHANCED = False
+    print("⚠️  ML models not available. Enhanced predictions disabled.")
+
 warnings.filterwarnings('ignore')
 
 # ---------------------------------------------------------------------------
@@ -157,11 +166,19 @@ def generate_sample_games() -> List[Dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 class BettingModel:
-    """Core betting analysis model."""
+    """Core betting analysis model with ML enhancement."""
     
     def __init__(self, bankroll: float = DEFAULT_BANKROLL):
         self.bankroll = bankroll
         self.total_risk = 0.0
+        
+        # Initialize ML models and data manager
+        if ML_ENHANCED:
+            self.ml_manager = MLModelManager()
+            self.data_manager = DataManager()
+        else:
+            self.ml_manager = None
+            self.data_manager = None
         
     @retry(stop=stop_after_attempt(3), wait=wait_fixed(1))
     def fetch_odds_data(self) -> List[Dict[str, Any]]:
@@ -193,9 +210,46 @@ class BettingModel:
             return self._calculate_default_fair_odds(game)
     
     def _calculate_mlb_fair_odds(self, game: Dict[str, Any]) -> Dict[str, float]:
-        """Calculate fair odds for MLB using Poisson distribution."""
+        """Calculate fair odds for MLB using ML models + Poisson distribution."""
         
-        # Simulate team strengths (in production, this would use real stats)
+        # Try ML-enhanced prediction first
+        if self.ml_manager and ML_ENHANCED:
+            try:
+                # Prepare features for ML model
+                ml_features = {
+                    'DayOfWeek': datetime.now().weekday(),
+                    'Month': datetime.now().month,
+                    'HomeTeamERA': random.uniform(3.0, 5.5),  # Would be real data in production
+                    'AwayTeamERA': random.uniform(3.0, 5.5),
+                    'HomeTeamOPS': random.uniform(0.650, 0.850),
+                    'AwayTeamOPS': random.uniform(0.650, 0.850),
+                    'Temperature': random.randint(60, 95),
+                    'WindSpeed': random.randint(0, 20),
+                    'HomeField_Advantage': 1
+                }
+                
+                ml_prediction = self.ml_manager.get_enhanced_prediction('MLB', ml_features)
+                
+                if ml_prediction and ml_prediction.confidence > 0.3:
+                    # Use ML prediction with high confidence
+                    home_prob = ml_prediction.home_win_prob
+                    away_prob = ml_prediction.away_win_prob
+                    
+                    # Convert to fair odds
+                    home_fair_odds = (1 / home_prob) * 100 - 100 if home_prob > 0.5 else -(100 / (home_prob / (1 - home_prob)))
+                    away_fair_odds = (1 / away_prob) * 100 - 100 if away_prob > 0.5 else -(100 / (away_prob / (1 - away_prob)))
+                    
+                    return {
+                        'home_fair_odds': home_fair_odds,
+                        'away_fair_odds': away_fair_odds,
+                        'ml_enhanced': True,
+                        'ml_confidence': ml_prediction.confidence
+                    }
+            
+            except Exception as e:
+                print(f"⚠️  ML prediction failed, falling back to Monte Carlo: {e}")
+        
+        # Fallback to Monte Carlo simulation
         home_runs_avg = LEAGUE_AVG_RUNS * random.uniform(0.8, 1.2)
         away_runs_avg = LEAGUE_AVG_RUNS * random.uniform(0.8, 1.2)
         
@@ -219,13 +273,51 @@ class BettingModel:
         
         return {
             'home_fair_odds': home_fair_odds,
-            'away_fair_odds': away_fair_odds
+            'away_fair_odds': away_fair_odds,
+            'ml_enhanced': False
         }
     
     def _calculate_soccer_fair_odds(self, game: Dict[str, Any]) -> Dict[str, float]:
-        """Calculate fair odds for Soccer using expected goals model."""
+        """Calculate fair odds for Soccer using ML models + xG model."""
         
-        # Simulate xG values (in production, this would use real data)
+        # Try ML-enhanced prediction first
+        if self.ml_manager and ML_ENHANCED:
+            try:
+                # Prepare features for ML model
+                ml_features = {
+                    'day_of_week': datetime.now().weekday(),
+                    'month': datetime.now().month,
+                    'weekend': 1 if datetime.now().weekday() >= 5 else 0,
+                    'league_strength': 4,  # Average league strength
+                    'home_xg': random.uniform(1.0, 2.5),  # Would be real data in production
+                    'away_xg': random.uniform(1.0, 2.5),
+                    'possession_home': random.randint(40, 60),
+                    'possession_away': random.randint(40, 60),
+                    'shots_home': random.randint(8, 18),
+                    'shots_away': random.randint(8, 18)
+                }
+                
+                ml_prediction = self.ml_manager.get_enhanced_prediction('SOCCER', ml_features)
+                
+                if ml_prediction and ml_prediction.confidence > 0.3:
+                    # Use ML prediction with high confidence
+                    home_prob = ml_prediction.home_win_prob
+                    away_prob = ml_prediction.away_win_prob
+                    draw_prob = ml_prediction.draw_prob
+                    
+                    # Convert to fair odds
+                    return {
+                        'home_fair_odds': (1 / home_prob) * 100 - 100,
+                        'away_fair_odds': (1 / away_prob) * 100 - 100,
+                        'draw_fair_odds': (1 / draw_prob) * 100 - 100,
+                        'ml_enhanced': True,
+                        'ml_confidence': ml_prediction.confidence
+                    }
+            
+            except Exception as e:
+                print(f"⚠️  ML prediction failed, falling back to xG model: {e}")
+        
+        # Fallback to xG model
         home_xg = random.uniform(1.0, 2.5)
         away_xg = random.uniform(1.0, 2.5)
         
@@ -241,7 +333,8 @@ class BettingModel:
         return {
             'home_fair_odds': (1 / home_prob) * 100 - 100,
             'away_fair_odds': (1 / away_prob) * 100 - 100,
-            'draw_fair_odds': (1 / draw_prob) * 100 - 100
+            'draw_fair_odds': (1 / draw_prob) * 100 - 100,
+            'ml_enhanced': False
         }
     
     def _calculate_default_fair_odds(self, game: Dict[str, Any]) -> Dict[str, float]:
