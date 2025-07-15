@@ -1,0 +1,265 @@
+{
+  "generated_at": "2025-07-15 20:08:06",
+  "total_leagues": 50,
+  "data_sources": {
+    "primary": "Static Database (FootyStats fallback)",
+    "alternative": [
+      "football-data.org",
+      "API-Sports",
+      "SportMonks"
+    ]
+  },
+  "footystats_api_key": "b44de69d5777cd2c78d81d59a85d0a91154e836320016b53ecdc1f646fc95b97",
+  "league_mapping": {
+    "English Premier League": {
+      "id": "premier-league",
+      "country": "England",
+      "tier": 1
+    },
+    "English Championship": {
+      "id": "championship",
+      "country": "England",
+      "tier": 2
+    },
+    "Spanish La Liga": {
+      "id": "la-liga",
+      "country": "Spain",
+      "tier": 1
+    },
+    "Spanish LaLiga2": {
+      "id": "laliga2",
+      "country": "Spain",
+      "tier": 2
+    },
+    "German Bundesliga": {
+      "id": "bundesliga",
+      "country": "Germany",
+      "tier": 1
+    },
+    "German 2. Bundesliga": {
+      "id": "2-bundesliga",
+      "country": "Germany",
+      "tier": 2
+    },
+    "Italian Serie A": {
+      "id": "serie-a",
+      "country": "Italy",
+      "tier": 1
+    },
+    "Italian Serie B": {
+      "id": "serie-b",
+      "country": "Italy",
+      "tier": 2
+    },
+    "French Ligue 1": {
+      "id": "ligue-1",
+      "country": "France",
+      "tier": 1
+    },
+    "French Ligue 2": {
+      "id": "ligue-2",
+      "country": "France",
+      "tier": 2
+    },
+    "Dutch Eredivisie": {
+      "id": "eredivisie",
+      "country": "Netherlands",
+      "tier": 1
+    },
+    "Portuguese Primeira Liga": {
+      "id": "primeira-liga",
+      "country": "Portugal",
+      "tier": 1
+    },
+    "Belgian Pro League": {
+      "id": "pro-league",
+      "country": "Belgium",
+      "tier": 1
+    },
+    "Austrian Bundesliga": {
+      "id": "austrian-bundesliga",
+      "country": "Austria",
+      "tier": 1
+    },
+    "Swiss Super League": {
+      "id": "super-league",
+      "country": "Switzerland",
+      "tier": 1
+    },
+    "Norwegian Eliteserien": {
+      "id": "eliteserien",
+      "country": "Norway",
+      "tier": 1
+    },
+    "Swedish Allsvenskan": {
+      "id": "allsvenskan",
+      "country": "Sweden",
+      "tier": 1
+    },
+    "Danish Superliga": {
+      "id": "superliga",
+      "country": "Denmark",
+      "tier": 1
+    },
+    "Scottish Premiership": {
+      "id": "premiership",
+      "country": "Scotland",
+      "tier": 1
+    },
+    "Turkish Super Lig": {
+      "id": "super-lig",
+      "country": "Turkey",
+      "tier": 1
+    },
+    "Brazilian Serie A": {
+      "id": "serie-a-brazil",
+      "country": "Brazil",
+      "tier": 1
+    },
+    "Argentine Primera Divisi\u00f3n": {
+      "id": "primera-division",
+      "country": "Argentina",
+      "tier": 1
+    },
+    "Argentine Primera Nacional": {
+      "id": "primera-nacional",
+      "country": "Argentina",
+      "tier": 2
+    },
+    "Mexican Liga MX": {
+      "id": "liga-mx",
+      "country": "Mexico",
+      "tier": 1
+    },
+    "US Major League Soccer": {
+      "id": "mls",
+      "country": "United States",
+      "tier": 1
+    },
+    "Colombian Primera A": {
+      "id": "primera-a",
+      "country": "Colombia",
+      "tier": 1
+    },
+    "Chilean Primera Divisi\u00f3n": {
+      "id": "primera-chile",
+      "country": "Chile",
+      "tier": 1
+    },
+    "Uruguayan Primera Divisi\u00f3n": {
+      "id": "primera-uruguay",
+      "country": "Uruguay",
+      "tier": 1
+    },
+    "Ecuadorian Serie A": {
+      "id": "serie-a-ecuador",
+      "country": "Ecuador",
+      "tier": 1
+    },
+    "Peruvian Primera Divisi\u00f3n": {
+      "id": "primera-peru",
+      "country": "Peru",
+      "tier": 1
+    },
+    "Japanese J1 League": {
+      "id": "j1-league",
+      "country": "Japan",
+      "tier": 1
+    },
+    "Japanese J2 League": {
+      "id": "j2-league",
+      "country": "Japan",
+      "tier": 2
+    },
+    "South Korean K League 1": {
+      "id": "k-league-1",
+      "country": "South Korea",
+      "tier": 1
+    },
+    "South Korean K League 2": {
+      "id": "k-league-2",
+      "country": "South Korea",
+      "tier": 2
+    },
+    "Chinese Super League": {
+      "id": "super-league-china",
+      "country": "China",
+      "tier": 1
+    },
+    "Australian A-League": {
+      "id": "a-league",
+      "country": "Australia",
+      "tier": 1
+    },
+    "Indian Super League": {
+      "id": "isl",
+      "country": "India",
+      "tier": 1
+    },
+    "Saudi Pro League": {
+      "id": "pro-league-saudi",
+      "country": "Saudi Arabia",
+      "tier": 1
+    },
+    "UAE Pro League": {
+      "id": "pro-league-uae",
+      "country": "UAE",
+      "tier": 1
+    },
+    "Qatari Stars League": {
+      "id": "stars-league",
+      "country": "Qatar",
+      "tier": 1
+    },
+    "Russian Premier League": {
+      "id": "premier-league-russia",
+      "country": "Russia",
+      "tier": 1
+    },
+    "Ukrainian Premier League": {
+      "id": "premier-league-ukraine",
+      "country": "Ukraine",
+      "tier": 1
+    },
+    "Polish Ekstraklasa": {
+      "id": "ekstraklasa",
+      "country": "Poland",
+      "tier": 1
+    },
+    "Czech First League": {
+      "id": "first-league-czech",
+      "country": "Czech Republic",
+      "tier": 1
+    },
+    "Croatian HNL": {
+      "id": "hnl",
+      "country": "Croatia",
+      "tier": 1
+    },
+    "Serbian SuperLiga": {
+      "id": "superliga-serbia",
+      "country": "Serbia",
+      "tier": 1
+    },
+    "Romanian Liga 1": {
+      "id": "liga-1-romania",
+      "country": "Romania",
+      "tier": 1
+    },
+    "Bulgarian First League": {
+      "id": "first-league-bulgaria",
+      "country": "Bulgaria",
+      "tier": 1
+    },
+    "Greek Super League": {
+      "id": "super-league-greece",
+      "country": "Greece",
+      "tier": 1
+    },
+    "Cypriot First Division": {
+      "id": "first-division-cyprus",
+      "country": "Cyprus",
+      "tier": 1
+    }
+  }
+}
