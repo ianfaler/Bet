@@ -1,59 +1,235 @@
 # FootyStats League Configuration
-# Generated automatically with static fallback
-# Generated: 2025-07-15 20:08:06
+# Updated with correct API endpoints and 2025 season IDs
+# Generated: 2025-01-07
 
 FOOTYSTATS_API_KEY = "b44de69d5777cd2c78d81d59a85d0a91154e836320016b53ecdc1f646fc95b97"
 
-# 50 Major Soccer Leagues Configuration
+# Correct FootyStats API Base URL
+FOOTYSTATS_BASE_URL = "https://api.football-data-api.com"
+
+# API Endpoints
+FOOTYSTATS_ENDPOINTS = {
+    "league_teams": "league-teams",
+    "league_season": "league-season",
+    "league_matches": "league-matches"  # If available
+}
+
+# 52 Major Soccer Leagues Configuration - 2025 Season IDs
 FOOTYSTATS_LEAGUE_IDS = {
-    "English Premier League": "premier-league",
-    "English Championship": "championship",
-    "Spanish La Liga": "la-liga",
-    "Spanish LaLiga2": "laliga2",
-    "German Bundesliga": "bundesliga",
-    "German 2. Bundesliga": "2-bundesliga",
-    "Italian Serie A": "serie-a",
-    "Italian Serie B": "serie-b",
-    "French Ligue 1": "ligue-1",
-    "French Ligue 2": "ligue-2",
-    "Dutch Eredivisie": "eredivisie",
-    "Portuguese Primeira Liga": "primeira-liga",
-    "Belgian Pro League": "pro-league",
-    "Austrian Bundesliga": "austrian-bundesliga",
-    "Swiss Super League": "super-league",
-    "Norwegian Eliteserien": "eliteserien",
-    "Swedish Allsvenskan": "allsvenskan",
-    "Danish Superliga": "superliga",
-    "Scottish Premiership": "premiership",
-    "Turkish Super Lig": "super-lig",
-    "Brazilian Serie A": "serie-a-brazil",
-    "Argentine Primera División": "primera-division",
-    "Argentine Primera Nacional": "primera-nacional",
-    "Mexican Liga MX": "liga-mx",
-    "US Major League Soccer": "mls",
-    "Colombian Primera A": "primera-a",
-    "Chilean Primera División": "primera-chile",
-    "Uruguayan Primera División": "primera-uruguay",
-    "Ecuadorian Serie A": "serie-a-ecuador",
-    "Peruvian Primera División": "primera-peru",
-    "Japanese J1 League": "j1-league",
-    "Japanese J2 League": "j2-league",
-    "South Korean K League 1": "k-league-1",
-    "South Korean K League 2": "k-league-2",
-    "Chinese Super League": "super-league-china",
-    "Australian A-League": "a-league",
-    "Indian Super League": "isl",
-    "Saudi Pro League": "pro-league-saudi",
-    "UAE Pro League": "pro-league-uae",
-    "Qatari Stars League": "stars-league",
-    "Russian Premier League": "premier-league-russia",
-    "Ukrainian Premier League": "premier-league-ukraine",
-    "Polish Ekstraklasa": "ekstraklasa",
-    "Czech First League": "first-league-czech",
-    "Croatian HNL": "hnl",
-    "Serbian SuperLiga": "superliga-serbia",
-    "Romanian Liga 1": "liga-1-romania",
-    "Bulgarian First League": "first-league-bulgaria",
-    "Greek Super League": "super-league-greece",
-    "Cypriot First Division": "first-division-cyprus",
+    "Argentine Primera División": 13945,
+    "Argentina Primera Nacional": 13948,
+    "A-League": 13968,
+    "Austrian Bundesliga": 13993,
+    "Belgian Pro League": 13956,
+    "Brazilian Serie A": 13944,
+    "Brazilian Serie B": 13958,
+    "Chilean Primera Division": 13975,
+    "Chinese Super League": 13974,
+    "Colombian Primera A": 13946,
+    "Croatian HNL": 13980,
+    "Cypriot First Division": 13977,
+    "Czech First League": 13979,
+    "Danish Superliga": 13991,
+    "Danish 1st Division": 14013,
+    "Ecuadorian Serie A": 14009,
+    "English Premier League": 13943,
+    "English Championship": 13949,
+    "French Ligue 1": 13947,
+    "French Ligue 2": 13989,
+    "German Bundesliga": 13951,
+    "German 2. Bundesliga": 13950,
+    "Greek Super League": 13978,
+    "Indian Super League": 14010,
+    "Israeli Premier League": 13985,
+    "Italian Serie A": 13952,
+    "Italian Serie B": 13970,
+    "Japanese J1 League": 13959,
+    "Japanese J2 League": 14001,
+    "Liga MX": 13954,
+    "Dutch Eredivisie": 13955,
+    "Norwegian Eliteserien": 13995,
+    "Norwegian OBOS-ligaen": 14017,
+    "Peruvian Liga 1": 14008,
+    "Polish Ekstraklasa": 13988,
+    "Portuguese Primeira Liga": 13953,
+    "Portuguese Segunda Liga": 14006,
+    "Qatari Stars League": 14004,
+    "Romanian Liga I": 13984,
+    "Russian Premier League": 13971,
+    "Saudi Professional League": 13997,
+    "Scottish Premiership": 13990,
+    "Serbian SuperLiga": 13986,
+    "K League 1": 13976,
+    "Spanish La Liga": 13942,
+    "Spanish LaLiga2": 13969,
+    "Swedish Allsvenskan": 13994,
+    "Swiss Super League": 13992,
+    "Turkish Super Lig": 13987,
+    "Ukrainian Premier League": 14000,
+    "US MLS": 13973,
+    "Uruguayan Primera Division": 13996,
+}
+
+# Helper functions to build API URLs
+def get_league_teams_url(season_id: int, include_stats: bool = True) -> str:
+    """Build URL for league teams endpoint."""
+    url = f"{FOOTYSTATS_BASE_URL}/{FOOTYSTATS_ENDPOINTS['league_teams']}"
+    params = f"?key={FOOTYSTATS_API_KEY}&season_id={season_id}"
+    if include_stats:
+        params += "&include=stats"
+    return url + params
+
+def get_league_season_url(season_id: int) -> str:
+    """Build URL for league season endpoint."""
+    url = f"{FOOTYSTATS_BASE_URL}/{FOOTYSTATS_ENDPOINTS['league_season']}"
+    params = f"?key={FOOTYSTATS_API_KEY}&season_id={season_id}"
+    return url + params
+
+# League mapping by country for organization
+LEAGUE_BY_COUNTRY = {
+    "Argentina": {
+        "Argentine Primera División": 13945,
+        "Argentina Primera Nacional": 13948
+    },
+    "Australia": {
+        "A-League": 13968
+    },
+    "Austria": {
+        "Austrian Bundesliga": 13993
+    },
+    "Belgium": {
+        "Belgian Pro League": 13956
+    },
+    "Brazil": {
+        "Brazilian Serie A": 13944,
+        "Brazilian Serie B": 13958
+    },
+    "Chile": {
+        "Chilean Primera Division": 13975
+    },
+    "China": {
+        "Chinese Super League": 13974
+    },
+    "Colombia": {
+        "Colombian Primera A": 13946
+    },
+    "Croatia": {
+        "Croatian HNL": 13980
+    },
+    "Cyprus": {
+        "Cypriot First Division": 13977
+    },
+    "Czech Republic": {
+        "Czech First League": 13979
+    },
+    "Denmark": {
+        "Danish Superliga": 13991,
+        "Danish 1st Division": 14013
+    },
+    "Ecuador": {
+        "Ecuadorian Serie A": 14009
+    },
+    "England": {
+        "English Premier League": 13943,
+        "English Championship": 13949
+    },
+    "France": {
+        "French Ligue 1": 13947,
+        "French Ligue 2": 13989
+    },
+    "Germany": {
+        "German Bundesliga": 13951,
+        "German 2. Bundesliga": 13950
+    },
+    "Greece": {
+        "Greek Super League": 13978
+    },
+    "India": {
+        "Indian Super League": 14010
+    },
+    "Israel": {
+        "Israeli Premier League": 13985
+    },
+    "Italy": {
+        "Italian Serie A": 13952,
+        "Italian Serie B": 13970
+    },
+    "Japan": {
+        "Japanese J1 League": 13959,
+        "Japanese J2 League": 14001
+    },
+    "Mexico": {
+        "Liga MX": 13954
+    },
+    "Netherlands": {
+        "Dutch Eredivisie": 13955
+    },
+    "Norway": {
+        "Norwegian Eliteserien": 13995,
+        "Norwegian OBOS-ligaen": 14017
+    },
+    "Peru": {
+        "Peruvian Liga 1": 14008
+    },
+    "Poland": {
+        "Polish Ekstraklasa": 13988
+    },
+    "Portugal": {
+        "Portuguese Primeira Liga": 13953,
+        "Portuguese Segunda Liga": 14006
+    },
+    "Qatar": {
+        "Qatari Stars League": 14004
+    },
+    "Romania": {
+        "Romanian Liga I": 13984
+    },
+    "Russia": {
+        "Russian Premier League": 13971
+    },
+    "Saudi Arabia": {
+        "Saudi Professional League": 13997
+    },
+    "Scotland": {
+        "Scottish Premiership": 13990
+    },
+    "Serbia": {
+        "Serbian SuperLiga": 13986
+    },
+    "South Korea": {
+        "K League 1": 13976
+    },
+    "Spain": {
+        "Spanish La Liga": 13942,
+        "Spanish LaLiga2": 13969
+    },
+    "Sweden": {
+        "Swedish Allsvenskan": 13994
+    },
+    "Switzerland": {
+        "Swiss Super League": 13992
+    },
+    "Turkey": {
+        "Turkish Super Lig": 13987
+    },
+    "Ukraine": {
+        "Ukrainian Premier League": 14000
+    },
+    "United States": {
+        "US MLS": 13973
+    },
+    "Uruguay": {
+        "Uruguayan Primera Division": 13996
+    }
+}
+
+# Pre-built URLs for convenience
+LEAGUE_TEAMS_URLS = {
+    league_name: get_league_teams_url(season_id)
+    for league_name, season_id in FOOTYSTATS_LEAGUE_IDS.items()
+}
+
+LEAGUE_SEASON_URLS = {
+    league_name: get_league_season_url(season_id)
+    for league_name, season_id in FOOTYSTATS_LEAGUE_IDS.items()
 }
