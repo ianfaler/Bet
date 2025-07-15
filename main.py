@@ -40,9 +40,7 @@ warnings.filterwarnings('ignore')
 
 ODDS_API_KEY = os.getenv("ODDS_API_KEY", "f25b4597c8275546821c5d47a2f727eb")
 FOOTYSTATS_API_KEY = os.getenv("FOOTYSTATS_API_KEY", "b44de69d5777cd2c78d81d59a85d0a91154e836320016b53ecdc1f646fc95b97")
-APISPORTS_KEY = os.getenv("APISPORTS_KEY", "0002b89b
-Thought for 4s
-I see the issue! The main.py file is quite large (858 lines) and may have been truncated or hard to see. Let me break it down into manageable sections for you to copy-paste:
+APISPORTS_KEY = os.getenv("APISPORTS_KEY", "0002b89b1ff8422f9c09c72a69c1f3ab")
 
 📁 main.py - Section 1: Imports and Configuration
 # -*- coding: utf-8 -*-

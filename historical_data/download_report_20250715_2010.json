@@ -1,0 +1,143 @@
+{
+  "download_date": "2025-07-15T20:10:42.141410",
+  "mlb_data": {
+    "files": 1,
+    "latest_file": "historical_data/mlb/mlb_historical_data_20250715.zip"
+  },
+  "soccer_data": {
+    "Italy": {
+      "Italian Serie A": 0,
+      "Italian Serie B": 0
+    },
+    "Switzerland": {
+      "Swiss Super League": 0
+    },
+    "China": {
+      "Chinese Super League": 0
+    },
+    "Czech Republic": {
+      "Czech First League": 0
+    },
+    "Peru": {
+      "Peruvian Liga 1": 0
+    },
+    "Uruguay": {
+      "Uruguayan Primera Division": 0
+    },
+    "Chile": {
+      "Chilean Primera Division": 0
+    },
+    "Colombia": {
+      "Colombian Primera A": 0
+    },
+    "Sweden": {
+      "Swedish Allsvenskan": 0
+    },
+    "Qatar": {
+      "Qatari Stars League": 0
+    },
+    "South Korea": {
+      "K League 1": 0
+    },
+    "Japan": {
+      "Japanese J1 League": 0,
+      "Japanese J2 League": 0
+    },
+    "Austria": {
+      "Austrian Bundesliga": 0
+    },
+    "Australia": {
+      "A-League": 0
+    },
+    "Cyprus": {
+      "Cypriot First Division": 0
+    },
+    "France": {
+      "French Ligue 2": 0,
+      "French Ligue 1": 0
+    },
+    "Germany": {
+      "German 2. Bundesliga": 0,
+      "German Bundesliga": 0
+    },
+    "Turkey": {
+      "Turkish Super Lig": 0
+    },
+    "Argentina": {
+      "Argentine Primera Divisi\u00f3n": 0,
+      "Argentina Primera Nacional": 0
+    },
+    "Ukraine": {
+      "Ukrainian Premier League": 0
+    },
+    "Scotland": {
+      "Scottish Premiership": 0
+    },
+    "Denmark": {
+      "Danish 1st Division": 0,
+      "Danish Superliga": 0
+    },
+    "Romania": {
+      "Romanian Liga I": 0
+    },
+    "Norway": {
+      "Norwegian OBOS-ligaen": 0,
+      "Norwegian Eliteserien": 0
+    },
+    "Netherlands": {
+      "Dutch Eredivisie": 0
+    },
+    "Spain": {
+      "Spanish La Liga": 0,
+      "Spanish LaLiga2": 0
+    },
+    "Ecuador": {
+      "Ecuadorian Serie A": 0
+    },
+    "India": {
+      "Indian Super League": 0
+    },
+    "Croatia": {
+      "Croatian HNL": 0
+    },
+    "Mexico": {
+      "Liga MX": 0
+    },
+    "Poland": {
+      "Polish Ekstraklasa": 0
+    },
+    "Russia": {
+      "Russian Premier League": 0
+    },
+    "Portugal": {
+      "Portuguese Primeira Liga": 0
+    },
+    "Israel": {
+      "Israeli Premier League": 0
+    },
+    "United States": {
+      "US MLS": 0
+    },
+    "Greece": {
+      "Greek Super League": 0
+    },
+    "Serbia": {
+      "Serbian SuperLiga": 0
+    },
+    "Brazil": {
+      "Brazilian Serie A": 0
+    },
+    "England": {
+      "English Championship": 0,
+      "English Premier League": 0
+    },
+    "Belgium": {
+      "Belgian Pro League": 0
+    },
+    "Saudi Arabia": {
+      "Saudi Professional League": 0
+    }
+  },
+  "total_files": 0,
+  "total_size_mb": 57.884695053100586
+}
