@@ -25,8 +25,8 @@ from urllib.parse import urlencode
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# API Configuration
-FOOTYSTATS_API_KEY = "b44de69d5777cd2c78d81d59a85d0a91154e836320016b53ecdc1f646fc95b97"
+# Configuration
+FOOTYSTATS_API_KEY = os.getenv("FOOTYSTATS_API_KEY", "")
 BASE_URL = "https://api.footystats.org"
 
 class FootyStatsAPIInvestigator:
@@ -66,7 +66,8 @@ class FootyStatsAPIInvestigator:
                     data = response.json()
                     if 'metadata' in data:
                         self.results['rate_limits'].update(data['metadata'])
-                except:
+                except (ValueError, KeyError, TypeError) as e:
+                    print(f"Warning: Could not parse rate limit metadata: {e}")
                     pass
             
             if response.status_code == 200:

@@ -9,10 +9,10 @@
 - **📊 Status**: Ready for machine learning model training
 
 ### **API Keys Configured**
-- **FootyStats API**: `b44de69d5777cd2c78d81d59a85d0a91154e836320016b53ecdc1f646fc95b97`
+- **FootyStats API**: `your_footystats_api_key_here`
   - ✅ Key is valid (confirmed via rate limit responses)
   - ⚠️ Endpoints need further investigation for correct usage
-- **The Odds API**: `f25b4597c8275546821c5d47a2f727eb`  
+- **The Odds API**: `your_odds_api_key_here`  
   - ✅ Configured in main.py and all related files
 - **SportsData.io**: Direct download access confirmed working
 

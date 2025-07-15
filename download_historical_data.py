@@ -30,9 +30,9 @@ SOCCER_DATA_DIR = DATA_DIR / "soccer"
 for dir_path in [DATA_DIR, MLB_DATA_DIR, SOCCER_DATA_DIR]:
     dir_path.mkdir(parents=True, exist_ok=True)
 
-# API Configuration
-FOOTYSTATS_API_KEY = os.getenv("FOOTYSTATS_API_KEY", "b44de69d5777cd2c78d81d59a85d0a91154e836320016b53ecdc1f646fc95b97")
-ODDS_API_KEY = os.getenv("ODDS_API_KEY", "f25b4597c8275546821c5d47a2f727eb")
+# API Configuration - Use environment variables for security
+FOOTYSTATS_API_KEY = os.getenv("FOOTYSTATS_API_KEY", "")
+ODDS_API_KEY = os.getenv("ODDS_API_KEY", "")
 SPORTSDATA_IO_URL = "https://sportsdata.io/members/download-file?product=f1cdda93-8f32-47bf-b5a9-4bc4f93947f6"
 
 # Soccer Leagues Configuration - 50 leagues as specified

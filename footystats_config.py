@@ -2,7 +2,10 @@
 # Generated automatically with static fallback
 # Generated: 2025-07-15 20:08:06
 
-FOOTYSTATS_API_KEY = "b44de69d5777cd2c78d81d59a85d0a91154e836320016b53ecdc1f646fc95b97"
+import os
+
+# Configuration
+FOOTYSTATS_API_KEY = os.getenv("FOOTYSTATS_API_KEY", "")
 
 # 50 Major Soccer Leagues Configuration
 FOOTYSTATS_LEAGUE_IDS = {

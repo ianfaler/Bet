@@ -3,13 +3,15 @@
 ## API Keys Configured
 
 ### FootyStats API
-- **API Key**: b44de69d5777cd2c78d81d59a85d0a91154e836320016b53ecdc1f646fc95b97
-- **Website**: https://footystats.org
-- **Documentation**: Check API documentation for correct endpoints
+- **API Key**: your_footystats_api_key_here
+- **Base URL**: https://api.footystats.org/
+- **Rate Limit**: 60 requests/minute
+- **Documentation**: https://footystats.org/api
 
 ### The Odds API  
-- **API Key**: f25b4597c8275546821c5d47a2f727eb
-- **Website**: https://the-odds-api.com
+- **API Key**: your_odds_api_key_here
+- **Base URL**: https://api.the-odds-api.com/v4/
+- **Rate Limit**: Varies by plan
 - **Documentation**: https://the-odds-api.com/liveapi/guides/v4/
 
 ### SportsData.io MLB Data

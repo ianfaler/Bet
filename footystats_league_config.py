@@ -10,11 +10,12 @@ alternative sources like football-data.org and API-Sports.
 import requests
 import json
 import time
+import os
 from typing import Dict, List, Any
 
-# API Keys
-FOOTYSTATS_API_KEY = "b44de69d5777cd2c78d81d59a85d0a91154e836320016b53ecdc1f646fc95b97"
-FOOTBALL_DATA_API_KEY = "YOUR_FOOTBALL_DATA_KEY"  # Backup source
+# API Configuration
+FOOTYSTATS_API_KEY = os.getenv("FOOTYSTATS_API_KEY", "")
+FOOTBALL_DATA_API_KEY = os.getenv("FOOTBALL_DATA_API_KEY", "")  # Backup source
 
 # Target 50 leagues for comprehensive coverage
 TARGET_LEAGUES = [

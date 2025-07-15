@@ -9,7 +9,7 @@
       "SportMonks"
     ]
   },
-  "footystats_api_key": "b44de69d5777cd2c78d81d59a85d0a91154e836320016b53ecdc1f646fc95b97",
+  "footystats_api_key": "",
   "league_mapping": {
     "English Premier League": {
       "id": "premier-league",

@@ -51,7 +51,7 @@ class EnhancedDataDownloader:
             'footystats': APIConfig(
                 name="FootyStats",
                 base_url="https://api.footystats.org",
-                headers={"X-API-KEY": "b44de69d5777cd2c78d81d59a85d0a91154e836320016b53ecdc1f646fc95b97"},
+                headers={"X-API-KEY": os.getenv("FOOTYSTATS_API_KEY", "")},
                 rate_limit=1.0,
                 daily_limit=1000,
                 free_tier=True
@@ -262,7 +262,7 @@ class EnhancedDataDownloader:
         """Download from FootyStats API"""
         endpoint = "league-matches"
         params = {
-            "key": "b44de69d5777cd2c78d81d59a85d0a91154e836320016b53ecdc1f646fc95b97",
+            "key": os.getenv("FOOTYSTATS_API_KEY", ""),
             "league_id": league_id,
             "season": season
         }

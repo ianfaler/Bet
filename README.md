@@ -88,7 +88,7 @@ Performance Target: <10 seconds (typically achieves ~3-4 seconds)
 pip install -r requirements.txt
 
 # Set API keys as environment variables
-export ODDS_API_KEY="your_odds_api_key"
+export ODDS_API_KEY="your_odds_api_key_here"
 export APISPORTS_KEY="your_apisports_key"
 export FOOTBALL_DATA_KEY="your_football_data_key"
 2. API Key Configuration
@@ -204,7 +204,7 @@ Performance Target: <10 seconds (typically achieves ~3-4 seconds)
 pip install -r requirements.txt
 
 # Set API keys as environment variables
-export ODDS_API_KEY="your_odds_api_key"
+export ODDS_API_KEY="your_odds_api_key_here"
 export APISPORTS_KEY="your_apisports_key"
 export FOOTBALL_DATA_KEY="your_football_data_key"
 2. API Key Configuration
@@ -287,8 +287,8 @@ python3 simple_data_downloader.py --all
 ```
 
 ### **API Keys Configured**
-- **FootyStats API**: `b44de69d5777cd2c78d81d59a85d0a91154e836320016b53ecdc1f646fc95b97`
-- **The Odds API**: `f25b4597c8275546821c5d47a2f727eb`
+- **FootyStats API**: `your_footystats_api_key_here`
+- **The Odds API**: `your_odds_api_key_here`
 - **SportsData.io**: Direct download URL for MLB historical data
 
 ### **Soccer Leagues (50 Total)**
