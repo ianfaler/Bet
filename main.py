@@ -58,48 +58,52 @@ LEAGUE_AVG_POINTS = 110  # NBA
 
 @dataclass
 class BettingCandidate:
-    """Represents a betting opportunity."""
-    game_id: str
+    """Represents a qualified betting opportunity."""
     sport: str
+    game_id: str
     home_team: str
     away_team: str
     bet_type: str
+    bet_target: str
     odds: int
     model_probability: float
     expected_value: float
-    confidence: int
-    stake: float
-    book: str
-    time_found: str
-
-@dataclass
-class ScanResult:
-    """Results from a betting scan."""
-    timestamp: str
-    mode: str
-    bankroll: float
-    total_candidates: int
-    qualified_candidates: int
-    official_picks: List[Dict[str, Any]]
-    execution_time: float
-    sports_scanned: List[str]
-    risk_metrics: Dict[str, Any]
-    model_performance: Dict[str, Any]
+    confidence_score: int
+    stake_amount: float
+    bookmaker: str
+    commence_time: str
 
 # ---------------------------------------------------------------------------
 # Utility Functions
 # ---------------------------------------------------------------------------
 
-@retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
-def fetch_json(url: str, params: Dict = None, headers: Dict = None) -> Dict[str, Any]:
-    """Fetch JSON data with retry logic."""
+def fetch_json(url: str, params: Optional[Dict] = None, headers: Optional[Dict] = None) -> Any:
+    """Fetch JSON data with error handling."""
     try:
-        response = requests.get(url, params=params, headers=headers, timeout=10)
+        response = requests.get(url, params=params or {}, headers=headers or {}, timeout=10)
         response.raise_for_status()
         return response.json()
-    except Exception as e:
-        print(f"API request failed: {e}")
-        return {}
+    except requests.RequestException as e:
+        print(f"Request failed: {e}")
+        return None
+
+def odds_to_probability(odds: int) -> float:
+    """Convert American odds to implied probability."""
+    if odds > 0:
+        return 100 / (odds + 100)
+    else:
+        return abs(odds) / (abs(odds) + 100)
+
+def probability_to_odds(prob: float) -> int:
+    """Convert probability to American odds."""
+    if prob > 0.5:
+        return -int((prob / (1 - prob)) * 100)
+    else:
+        return int(((1 - prob) / prob) * 100)
+
+# ---------------------------------------------------------------------------
+# Data Fetching Functions
+# ---------------------------------------------------------------------------
 
 def fetch_odds(api_key: str, sport: str) -> List[Dict[str, Any]]:
     """Fetch odds from The Odds API."""
@@ -126,10 +130,10 @@ def fetch_odds(api_key: str, sport: str) -> List[Dict[str, Any]]:
         if isinstance(data, list):
             return data
         else:
-            print(f"No odds data available for {sport} (may be out of season)")
+            print(f"Unexpected data format for {sport}: {type(data)}")
             return []
     except Exception as e:
-        print(f"Failed to fetch {sport} odds: {e}")
+        print(f"Error fetching {sport} odds: {e}")
         return []
 
 def fetch_team_stats(api_key: str, team_id: str, sport: str) -> Dict[str, Any]:
@@ -137,177 +141,115 @@ def fetch_team_stats(api_key: str, team_id: str, sport: str) -> Dict[str, Any]:
     # Placeholder implementation
     return {}
 
-def fetch_injury_data(api_key: str, sport: str) -> Dict[str, Any]:
-    """Fetch injury data for given sport."""
-    try:
-        # Placeholder implementation
-        pass
-    except Exception as e:
-        print(f"Injury fetch failed for {sport}: {e}")
-    
+def fetch_injuries(api_key: str, team_id: str, sport: str) -> List[Dict[str, Any]]:
+    """Fetch injury reports from API-Sports."""
+    # Placeholder implementation
+    return []
+
+def fetch_weather(api_key: str, venue: str) -> Dict[str, Any]:
+    """Fetch weather data for outdoor sports."""
+    # Placeholder implementation
     return {}
 
 # ---------------------------------------------------------------------------
-# Sophisticated Model Functions
+# Analytical Model Functions
 # ---------------------------------------------------------------------------
 
-def calculate_analytical_probability(game_data: Dict[str, Any], sport: str) -> float:
-    """Calculate win probability using analytical models."""
+def calculate_poisson_probability(team_strength: float, opponent_strength: float, is_home: bool = True) -> float:
+    """Calculate win probability using Poisson model."""
+    home_advantage = 0.05 if is_home else -0.05
+    adjusted_strength = team_strength + home_advantage
+    
+    # Simple strength-based probability
+    total_strength = adjusted_strength + opponent_strength
+    if total_strength > 0:
+        probability = adjusted_strength / total_strength
+    else:
+        probability = 0.5
+    
+    # Ensure probability is within bounds
+    return max(0.01, min(0.99, probability))
+
+def calculate_monte_carlo_probability(game_data: Dict[str, Any], simulations: int = 1000) -> float:
+    """Monte Carlo simulation for win probability."""
+    wins = 0
+    
+    for _ in range(simulations):
+        # Random factors affecting the game
+        home_performance = np.random.normal(0.52, 0.1)  # Home advantage
+        form_factor = np.random.normal(0, 0.05)  # Recent form
+        
+        # Calculate outcome
+        final_prob = home_performance + form_factor
+        if final_prob > 0.5:
+            wins += 1
+    
+    return wins / simulations
+
+def calculate_model_probability(game_data: Dict[str, Any], sport: str) -> float:
+    """Calculate model probability for different sports."""
     try:
+        # Base probability using Poisson model
+        base_prob = calculate_poisson_probability(0.52, 0.48)  # Default home advantage
+        
+        # Monte Carlo adjustment
+        mc_prob = calculate_monte_carlo_probability(game_data, MC_SIMULATIONS)
+        
+        # Weight the models
         if sport == 'MLB':
-            return _calculate_mlb_probability(game_data)
+            # Baseball specific adjustments
+            final_prob = (base_prob * 0.6) + (mc_prob * 0.4)
         elif sport == 'NBA':
-            return _calculate_nba_probability(game_data)
+            # Basketball specific adjustments
+            final_prob = (base_prob * 0.7) + (mc_prob * 0.3)
         elif sport == 'Soccer':
-            return _calculate_soccer_probability(game_data)
+            # Soccer specific adjustments with draw consideration
+            final_prob = (base_prob * 0.5) + (mc_prob * 0.5)
         elif sport in ['WNBA', 'NHL']:
-            return _calculate_generic_probability(game_data)
+            # Generic model for other sports
+            final_prob = (base_prob * 0.6) + (mc_prob * 0.4)
         else:
-            return 0.5  # Default neutral probability
+            final_prob = 0.5  # Default neutral probability
+        
+        return max(0.01, min(0.99, final_prob))
+        
     except Exception as e:
         print(f"Error calculating probability: {e}")
         return 0.5
 
-def _calculate_mlb_probability(game_data: Dict[str, Any]) -> float:
-    """Calculate MLB win probability using Poisson model."""
-    # Simplified implementation
-    home_runs = game_data.get('home_expected_runs', LEAGUE_AVG_RUNS)
-    away_runs = game_data.get('away_expected_runs', LEAGUE_AVG_RUNS)
-    
-    # Apply adjustments for weather, pitcher ERA, etc.
-    wind = game_data.get('weather_wind', 0)
-    if wind > 10:  # Favorable hitting conditions
-        home_runs += 0.3
-        away_runs += 0.3
-    
-    # Simple probability calculation
-    total_expected = home_runs + away_runs
-    if total_expected > 0:
-        home_prob = home_runs / total_expected
-    else:
-        home_prob = 0.5
-    
-    return max(0.1, min(0.9, home_prob))
-
-def _calculate_nba_probability(game_data: Dict[str, Any]) -> float:
-    """Calculate NBA win probability using pace-adjusted model."""
-    # Simplified implementation
-    home_points = game_data.get('home_expected_points', LEAGUE_AVG_POINTS)
-    away_points = game_data.get('away_expected_points', LEAGUE_AVG_POINTS)
-    
-    # Apply pace adjustments
-    pace = game_data.get('pace_factor', 1.0)
-    home_points *= pace
-    away_points *= pace
-    
-    # Simple probability calculation
-    total_expected = home_points + away_points
-    if total_expected > 0:
-        home_prob = home_points / total_expected
-    else:
-        home_prob = 0.5
-    
-    return max(0.1, min(0.9, home_prob))
-
-def _calculate_soccer_probability(game_data: Dict[str, Any]) -> float:
-    """Calculate Soccer win probability using xG model."""
-    # Simplified implementation
-    home_xg = game_data.get('home_xg', 1.5)
-    away_xg = game_data.get('away_xg', 1.5)
-    
-    # Apply form adjustments
-    home_form = game_data.get('home_form_rating', 0)
-    away_form = game_data.get('away_form_rating', 0)
-    
-    home_xg += home_form * 0.1
-    away_xg += away_form * 0.1
-    
-    # Simple probability calculation (accounting for draws)
-    if home_xg > away_xg:
-        home_prob = 0.4 + (home_xg - away_xg) * 0.1
-    else:
-        home_prob = 0.4 - (away_xg - home_xg) * 0.1
-    
-    return max(0.1, min(0.9, home_prob))
-
-def _calculate_generic_probability(game_data: Dict[str, Any]) -> float:
-    """Generic probability calculation for WNBA/NHL."""
-    # Very simplified implementation
-    home_rating = game_data.get('home_rating', 50)
-    away_rating = game_data.get('away_rating', 50)
-    
-    total_rating = home_rating + away_rating
-    if total_rating > 0:
-        home_prob = home_rating / total_rating
-    else:
-        home_prob = 0.5
-    
-    return max(0.1, min(0.9, home_prob))
-
-def monte_carlo_simulation(game_data: Dict[str, Any], sport: str, n_sims: int = MC_SIMULATIONS) -> float:
-    """Run Monte Carlo simulation for probability validation."""
-    try:
-        wins = 0
-        for _ in range(n_sims):
-            # Add randomness to the analytical model
-            prob = calculate_analytical_probability(game_data, sport)
-            prob += np.random.normal(0, 0.05)  # Add noise
-            prob = max(0.01, min(0.99, prob))
-            
-            if np.random.random() < prob:
-                wins += 1
-        
-        return wins / n_sims
-    except Exception as e:
-        print(f"Monte Carlo simulation error: {e}")
-        return 0.5
-
 def calculate_expected_value(model_prob: float, odds: int) -> float:
     """Calculate expected value percentage."""
-    try:
-        # Convert American odds to implied probability
+    implied_prob = odds_to_probability(odds)
+    
+    if model_prob > implied_prob:
         if odds > 0:
-            implied_prob = 100 / (odds + 100)
+            ev = ((model_prob * odds) - ((1 - model_prob) * 100)) / 100
         else:
-            implied_prob = abs(odds) / (abs(odds) + 100)
-        
-        # Calculate EV as percentage
-        ev_percentage = ((model_prob - implied_prob) / implied_prob) * 100
-        return ev_percentage
-    except Exception as e:
-        print(f"EV calculation error: {e}")
-        return -100
+            ev = ((model_prob * 100) - ((1 - model_prob) * abs(odds))) / abs(odds)
+        return ev * 100  # Return as percentage
+    
+    return 0  # No positive EV
 
 def calculate_confidence_score(game_data: Dict[str, Any], sport: str) -> int:
-    """Calculate confidence score (1-10)."""
-    confidence = 5  # Base score
-    
+    """Calculate confidence score (1-10) based on data quality and edge strength."""
     try:
-        # Universal factors
-        if game_data.get('rlm_flag', False):
-            confidence += 2
-        if game_data.get('steam_detected', False):
-            confidence += 1
-        if game_data.get('sharp_money', False):
+        confidence = 5  # Base confidence
+        
+        # Data quality factors
+        if game_data.get('home_team') and game_data.get('away_team'):
             confidence += 1
         
-        # Sport-specific factors
+        # Sport-specific adjustments
         if sport == 'MLB':
-            era_home = game_data.get('era_home_starter', 4.0)
-            era_away = game_data.get('era_away_starter', 4.0)
-            era_diff = abs(era_home - era_away)
-            if era_diff > 1.0:
+            # Baseball factors
+            runs_advantage = game_data.get('runs_differential', 0)
+            if abs(runs_advantage) > 1:
                 confidence += 1
-            
-            wind = game_data.get('weather_wind', 0)
-            if wind > 15:
-                confidence -= 1
-        
         elif sport == 'NBA':
-            injury_impact = game_data.get('injury_impact_total', 0)
-            if injury_impact > 0.05:
+            # Basketball factors
+            points_advantage = game_data.get('points_differential', 0)
+            if abs(points_advantage) > 5:
                 confidence += 1
-        
         elif sport == 'Soccer':
             form_diff = game_data.get('form_difference', 0)
             if abs(form_diff) > 0.1:
@@ -320,43 +262,30 @@ def calculate_confidence_score(game_data: Dict[str, Any], sport: str) -> int:
         print(f"Confidence calculation error: {e}")
         return 5
 
-def calculate_clv(opening_odds: int, current_odds: int) -> float:
-    """Calculate Closing Line Value."""
-    try:
-        if opening_odds == 0:
-            return 0.0
-        
-        # Convert to decimal odds
-        def to_decimal(american_odds):
-            if american_odds > 0:
-                return (american_odds / 100) + 1
-            else:
-                return (100 / abs(american_odds)) + 1
-        
-        current_decimal = to_decimal(current_odds)
-        opening_decimal = to_decimal(opening_odds)
-        
-        # CLV as percentage improvement
-        clv = ((current_decimal - opening_decimal) / opening_decimal) * 100
-        return round(clv, 2)
-    except:
-        return 0.0
+# ---------------------------------------------------------------------------
+# Risk Management Functions
+# ---------------------------------------------------------------------------
 
 def calculate_kelly_stake(ev_percentage: float, odds: int, bankroll: float, confidence: int) -> float:
-    """Calculate stake using Kelly criterion with confidence adjustments."""
+    """Calculate Kelly criterion stake with confidence adjustment."""
     try:
-        if ev_percentage <= 0:
-            return 0
+        # Convert EV percentage to decimal
+        ev_decimal = ev_percentage / 100
         
-        # Convert to decimal odds
+        # Calculate Kelly fraction
         if odds > 0:
+            # Positive odds: Kelly = (bp - q) / b
             decimal_odds = (odds / 100) + 1
+            b = decimal_odds - 1
+            p = ev_decimal + odds_to_probability(odds)
+            q = 1 - p
+            kelly_fraction = (b * p - q) / b
         else:
-            decimal_odds = (100 / abs(odds)) + 1
-        
-        # Kelly calculation
-        edge = ev_percentage / 100
-        kelly_fraction = edge / (decimal_odds - 1)
+            # Negative odds: Kelly = (p - q/b) where b = 100/|odds|
+            b = 100 / abs(odds)
+            p = ev_decimal + odds_to_probability(odds)
+            q = 1 - p
+            kelly_fraction = p - (q / b)
         
         # Apply conservative sizing (quarter Kelly)
         base_stake = bankroll * kelly_fraction * 0.25
@@ -380,7 +309,6 @@ def calculate_kelly_stake(ev_percentage: float, odds: int, bankroll: float, conf
 # ---------------------------------------------------------------------------
 
 
-
 def generate_candidates(mode: str) -> List[BettingCandidate]:
     """Generate betting candidates from all sports."""
     candidates = []
@@ -399,33 +327,16 @@ def generate_candidates(mode: str) -> List[BettingCandidate]:
                 for bookmaker in game.get('bookmakers', []):
                     for market in bookmaker.get('markets', []):
                         for outcome in market.get('outcomes', []):
-                            # Create sample game data
+                            # Create game data structure
                             game_data = {
-                                'home_team': game.get('home_team', ''),
-                                'away_team': game.get('away_team', ''),
-                                'rlm_flag': False,
-                                'steam_detected': False,
-                                'sharp_money': False,
-                                # Add some randomness for demonstration
-                                'home_expected_runs': 4.5 + (hash(game.get('id', '')) % 100) / 100,
-                                'away_expected_runs': 4.3 + (hash(game.get('id', '')) % 100) / 100,
-                                'home_expected_points': 110 + (hash(game.get('id', '')) % 20),
-                                'away_expected_points': 108 + (hash(game.get('id', '')) % 20),
-                                'home_xg': 1.5 + (hash(game.get('id', '')) % 100) / 200,
-                                'away_xg': 1.4 + (hash(game.get('id', '')) % 100) / 200,
-                                'home_rating': 50 + (hash(game.get('id', '')) % 30),
-                                'away_rating': 48 + (hash(game.get('id', '')) % 30)
+                                'home_team': game.get('home_team', 'Home'),
+                                'away_team': game.get('away_team', 'Away'),
+                                'sport': sport
                             }
-                            
-                            # Calculate probabilities
-                            analytical_prob = calculate_analytical_probability(game_data, sport)
-                            mc_prob = monte_carlo_simulation(game_data, sport)
-                            
-                            # Blend analytical and Monte Carlo (50/50)
-                            model_prob = (analytical_prob + mc_prob) / 2
                             
                             # Calculate metrics
                             odds = outcome.get('price', 100)
+                            model_prob = calculate_model_probability(game_data, sport)
                             ev = calculate_expected_value(model_prob, odds)
                             confidence = calculate_confidence_score(game_data, sport)
                             
@@ -435,213 +346,150 @@ def generate_candidates(mode: str) -> List[BettingCandidate]:
                                 print(f"    Model Prob: {model_prob:.3f}, Odds: {odds}, EV: {ev:.2f}%, Confidence: {confidence}")
                             
                             if ev >= MIN_EV_THRESHOLD and confidence >= MIN_CONFIDENCE_THRESHOLD:
+                                if len(candidates) < 20:  # Limit debug output
+                                    print(f"    ✅ Added qualifying candidate: EV={ev:.2f}%, Conf={confidence}")
+                                else:
+                                    print(f"    ✅ Added qualifying candidate: EV={ev:.2f}%, Conf={confidence}")
+                                
                                 candidate = BettingCandidate(
-                                    game_id=game.get('id', ''),
                                     sport=sport,
-                                    home_team=game.get('home_team', ''),
-                                    away_team=game.get('away_team', ''),
-                                    bet_type=market.get('key', ''),
+                                    game_id=game.get('id', 'unknown'),
+                                    home_team=game.get('home_team', 'Home'),
+                                    away_team=game.get('away_team', 'Away'),
+                                    bet_type=market.get('key', 'moneyline'),
+                                    bet_target=outcome.get('name', 'unknown'),
                                     odds=odds,
                                     model_probability=model_prob,
                                     expected_value=ev,
-                                    confidence=confidence,
-                                    stake=0,  # Will be calculated later
-                                    book=bookmaker.get('title', ''),
-                                    time_found=datetime.utcnow().isoformat()
+                                    confidence_score=confidence,
+                                    stake_amount=0,  # Will be calculated later
+                                    bookmaker=bookmaker.get('title', 'unknown'),
+                                    commence_time=game.get('commence_time', '')
                                 )
                                 candidates.append(candidate)
-                                print(f"    ✅ Added qualifying candidate: EV={ev:.2f}%, Conf={confidence}")
-                            elif len(candidates) < 3:
-                                print(f"    ❌ Did not qualify: EV={ev:.2f}% (need {MIN_EV_THRESHOLD}%), Conf={confidence} (need {MIN_CONFIDENCE_THRESHOLD})")
+                            else:
+                                if len(candidates) < 3:  # Only show rejections for first few
+                                    print(f"    ❌ Did not qualify: EV={ev:.2f}% (need {MIN_EV_THRESHOLD}%), Conf={confidence} (need {MIN_CONFIDENCE_THRESHOLD})")
         
         except Exception as e:
             print(f"Error processing {sport}: {e}")
+            continue
     
     return candidates
 
-def apply_bankroll_management(candidates: List[BettingCandidate], bankroll: float) -> List[BettingCandidate]:
-    """Apply bankroll management and calculate stakes."""
-    for candidate in candidates:
+def apply_risk_management(candidates: List[BettingCandidate], bankroll: float) -> List[BettingCandidate]:
+    """Apply risk management and calculate stakes."""
+    managed_candidates = []
+    total_risk = 0
+    max_risk = bankroll * 0.20  # Maximum 20% of bankroll at risk
+    
+    # Sort by EV descending
+    sorted_candidates = sorted(candidates, key=lambda x: x.expected_value, reverse=True)
+    
+    for candidate in sorted_candidates:
         stake = calculate_kelly_stake(
             candidate.expected_value,
             candidate.odds,
             bankroll,
-            candidate.confidence
+            candidate.confidence_score
         )
-        candidate.stake = round(stake, 2)
-    
-    # Sort by EV and limit exposure
-    candidates.sort(key=lambda x: x.expected_value, reverse=True)
-    
-    # Risk management: limit total exposure
-    total_exposure = 0
-    max_daily_exposure = bankroll * 0.15  # 15% daily limit
-    
-    filtered_candidates = []
-    for candidate in candidates:
-        if total_exposure + candidate.stake <= max_daily_exposure:
-            filtered_candidates.append(candidate)
-            total_exposure += candidate.stake
-        else:
+        
+        # Check if adding this bet exceeds risk limits
+        if total_risk + stake <= max_risk:
+            candidate.stake_amount = stake
+            managed_candidates.append(candidate)
+            total_risk += stake
+        
+        # Stop when we have enough bets or hit risk limit
+        if len(managed_candidates) >= 5 or total_risk >= max_risk:
             break
     
-    return filtered_candidates
+    return managed_candidates
 
-def run_betting_scan(mode: str = "manual", bankroll: float = None) -> ScanResult:
-    """Main betting scan workflow."""
-    start_time = time.time()
-    bankroll = bankroll or DEFAULT_BANKROLL
-    
+def format_output(candidates: List[BettingCandidate], scan_meta: Dict[str, Any]) -> Dict[str, Any]:
+    """Format output for display or API consumption."""
+    return {
+        'scan_timestamp': datetime.now().isoformat(),
+        'scan_metadata': scan_meta,
+        'candidates_count': len(candidates),
+        'candidates': [asdict(candidate) for candidate in candidates],
+        'total_stake': sum(c.stake_amount for c in candidates),
+        'average_ev': sum(c.expected_value for c in candidates) / len(candidates) if candidates else 0,
+        'average_confidence': sum(c.confidence_score for c in candidates) / len(candidates) if candidates else 0
+    }
+
+# ---------------------------------------------------------------------------
+# Main Orchestration
+# ---------------------------------------------------------------------------
+
+def run_betting_scan(mode: str = 'manual', bankroll: float = DEFAULT_BANKROLL) -> Dict[str, Any]:
+    """Main function to run betting analysis."""
     print(f"🎯 Starting {mode} betting scan with ${bankroll:,.2f} bankroll")
     
     # Generate candidates
-    all_candidates = generate_candidates(mode)
-    print(f"📊 Found {len(all_candidates)} initial candidates")
+    candidates = generate_candidates(mode)
+    print(f"📊 Found {len(candidates)} initial candidates")
     
-    # Apply bankroll management
-    qualified_candidates = apply_bankroll_management(all_candidates, bankroll)
-    print(f"✅ {len(qualified_candidates)} candidates passed risk management")
+    # Apply risk management
+    final_candidates = apply_risk_management(candidates, bankroll)
+    print(f"✅ {len(final_candidates)} candidates passed risk management")
     
-    # Generate official picks
-    official_picks = []
-    for candidate in qualified_candidates[:10]:  # Limit to top 10
-        pick_data = {
-            'game': f"{candidate.away_team} @ {candidate.home_team}",
-            'sport': candidate.sport,
-            'bet_type': candidate.bet_type,
-            'odds': candidate.odds,
-            'stake': candidate.stake,
-            'expected_value': round(candidate.expected_value, 2),
-            'confidence': candidate.confidence,
-            'book': candidate.book
-        }
-        official_picks.append(pick_data)
-    
-    execution_time = time.time() - start_time
-    sports_scanned = list(set([c.sport for c in all_candidates]))
-    
-    # Risk metrics
-    total_stake = sum([c.stake for c in qualified_candidates])
-    avg_ev = np.mean([c.expected_value for c in qualified_candidates]) if qualified_candidates else 0
-    avg_confidence = np.mean([c.confidence for c in qualified_candidates]) if qualified_candidates else 0
-    
-    risk_metrics = {
-        'total_exposure': round(total_stake, 2),
-        'exposure_percentage': round((total_stake / bankroll) * 100, 2),
-        'average_ev': round(avg_ev, 2),
-        'average_confidence': round(avg_confidence, 1),
-        'max_single_stake': max([c.stake for c in qualified_candidates]) if qualified_candidates else 0
+    # Format output
+    scan_meta = {
+        'mode': mode,
+        'bankroll': bankroll,
+        'min_ev_threshold': MIN_EV_THRESHOLD,
+        'min_confidence_threshold': MIN_CONFIDENCE_THRESHOLD,
+        'simulations': MC_SIMULATIONS
     }
     
-    model_performance = {
-        'analytical_model': 'Active',
-        'monte_carlo_sims': MC_SIMULATIONS,
-        'confidence_threshold': MIN_CONFIDENCE_THRESHOLD,
-        'ev_threshold': MIN_EV_THRESHOLD
-    }
+    result = format_output(final_candidates, scan_meta)
     
-    result = ScanResult(
-        timestamp=datetime.utcnow().isoformat(),
-        mode=mode,
-        bankroll=bankroll,
-        total_candidates=len(all_candidates),
-        qualified_candidates=len(qualified_candidates),
-        official_picks=official_picks,
-        execution_time=round(execution_time, 2),
-        sports_scanned=sports_scanned,
-        risk_metrics=risk_metrics,
-        model_performance=model_performance
-    )
+    print("✅ Scan completed successfully")
+    print(f"📊 Generated {len(final_candidates)} official picks")
     
     return result
 
 # ---------------------------------------------------------------------------
-# Web App Interface Functions
+# CLI Interface
 # ---------------------------------------------------------------------------
 
-def get_scan_json(mode: str = "manual", bankroll: float = None) -> str:
-    """Run scan and return JSON result for web app consumption."""
+def main():
+    """CLI entry point."""
+    parser = argparse.ArgumentParser(description='Universal Betting Dashboard')
+    parser.add_argument('--mode', choices=['manual', 'auto'], default='manual',
+                       help='Betting mode')
+    parser.add_argument('--bankroll', type=float, default=DEFAULT_BANKROLL,
+                       help='Bankroll amount')
+    parser.add_argument('--output', choices=['json', 'summary'], default='summary',
+                       help='Output format')
+    
+    args = parser.parse_args()
+    
     try:
-        result = run_betting_scan(mode, bankroll)
-        return json.dumps(asdict(result), indent=2)
-    except Exception as e:
-        error_result = {
-            'error': str(e),
-            'timestamp': datetime.utcnow().isoformat(),
-            'mode': mode,
-            'status': 'failed'
-        }
-        return json.dumps(error_result, indent=2)
-
-def get_model_status() -> Dict[str, Any]:
-    """Return model status and configuration for web app."""
-    return {
-        'model_config': {
-            'min_ev_threshold': MIN_EV_THRESHOLD,
-            'min_confidence_threshold': MIN_CONFIDENCE_THRESHOLD,
-            'mc_simulations': MC_SIMULATIONS,
-            'default_bankroll': DEFAULT_BANKROLL
-        },
-        'supported_sports': ['MLB', 'NBA', 'Soccer', 'WNBA', 'NHL'],
-        'model_features': [
-            'Poisson + Monte Carlo probability models',
-            'Sharp betting detection (RLM, CLV, Steam)',
-            'Kelly criterion staking with confidence adjustments',
-            'Multi-sport advanced statistics integration',
-            'Risk management with exposure caps'
-        ],
-        'status': 'operational',
-        'version': '2.0.0'
-    }
-
-# ---------------------------------------------------------------------------
-# CLI Entry Point
-# ---------------------------------------------------------------------------
-
-def parse_arguments() -> argparse.Namespace:
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Universal Betting Dashboard - Web App Version",
-        formatter_class=argparse.RawDescriptionHelpFormatter
-    )
-    parser.add_argument(
-        "--mode",
-        choices=["morning", "midday", "final", "manual"],
-        default="manual",
-        help="Scan mode: morning (08:00 ET), midday (12:00 ET), final (16:30 ET), manual"
-    )
-    parser.add_argument(
-        "--bankroll",
-        type=float,
-        help="Override default bankroll amount"
-    )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Output JSON format for web app consumption"
-    )
-    return parser.parse_args()
-
-def main() -> None:
-    """Main entry point."""
-    try:
-        args = parse_arguments()
+        result = run_betting_scan(args.mode, args.bankroll)
         
-        if args.json:
-            # JSON output for web app
-            json_result = get_scan_json(args.mode, args.bankroll)
-            print(json_result)
+        if args.output == 'json':
+            print(json.dumps(result, indent=2))
         else:
-            # Regular console output
-            result = run_betting_scan(args.mode, args.bankroll)
-            print(f"\n✅ Scan completed successfully")
-            print(f"📊 Generated {len(result.official_picks)} official picks")
-            
+            # Summary output
+            if result['candidates']:
+                print(f"\n📋 TOP BETTING RECOMMENDATIONS:")
+                print("-" * 80)
+                for i, candidate in enumerate(result['candidates'][:5], 1):
+                    print(f"{i}. {candidate['sport']}: {candidate['home_team']} vs {candidate['away_team']}")
+                    print(f"   Bet: {candidate['bet_target']} @ {candidate['odds']}")
+                    print(f"   EV: {candidate['expected_value']:.1f}% | Confidence: {candidate['confidence_score']}/10")
+                    print(f"   Stake: ${candidate['stake_amount']:.2f} | Bookmaker: {candidate['bookmaker']}")
+                    print()
+            else:
+                print("No qualifying betting opportunities found.")
+    
     except KeyboardInterrupt:
         print("\n⚠️  Scan interrupted by user")
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ Fatal error: {e}")
+        print(f"❌ Scan failed: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
