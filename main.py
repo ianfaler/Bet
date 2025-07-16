@@ -379,47 +379,7 @@ def calculate_kelly_stake(ev_percentage: float, odds: int, bankroll: float, conf
 # Main Workflow Functions
 # ---------------------------------------------------------------------------
 
-def generate_mock_data(sport: str) -> List[Dict[str, Any]]:
-    """Generate mock odds data for testing when APIs are unavailable."""
-    mock_teams = {
-        'MLB': [('Yankees', 'Red Sox'), ('Dodgers', 'Giants'), ('Astros', 'Rangers')],
-        'NBA': [('Lakers', 'Celtics'), ('Warriors', 'Nets'), ('Heat', 'Bulls')],
-        'Soccer': [('Arsenal', 'Chelsea'), ('Man City', 'Liverpool'), ('Barcelona', 'Real Madrid')],
-        'WNBA': [('Storm', 'Sky'), ('Aces', 'Liberty'), ('Sun', 'Mercury')],
-        'NHL': [('Rangers', 'Bruins'), ('Kings', 'Sharks'), ('Lightning', 'Panthers')]
-    }
-    
-    teams = mock_teams.get(sport, [('Team A', 'Team B')])
-    mock_games = []
-    
-    for i, (home_team, away_team) in enumerate(teams):
-        game = {
-            'id': f'mock_{sport.lower()}_{i}',
-            'home_team': home_team,
-            'away_team': away_team,
-            'bookmakers': [{
-                'title': 'DraftKings',
-                'markets': [
-                    {
-                        'key': 'h2h',
-                        'outcomes': [
-                            {'name': home_team, 'price': -110 + (i * 20)},
-                            {'name': away_team, 'price': +105 + (i * 15)}
-                        ]
-                    },
-                    {
-                        'key': 'spreads',
-                        'outcomes': [
-                            {'name': home_team, 'price': -110, 'point': -1.5},
-                            {'name': away_team, 'price': -110, 'point': 1.5}
-                        ]
-                    }
-                ]
-            }]
-        }
-        mock_games.append(game)
-    
-    return mock_games
+
 
 def generate_candidates(mode: str) -> List[BettingCandidate]:
     """Generate betting candidates from all sports."""
@@ -430,10 +390,10 @@ def generate_candidates(mode: str) -> List[BettingCandidate]:
         try:
             odds_data = fetch_odds(ODDS_API_KEY, sport)
             
-            # If no real data available, use mock data for demonstration
+            # Skip sport if no real data available
             if not odds_data:
-                print(f"Using mock data for {sport} (no live data available)")
-                odds_data = generate_mock_data(sport)
+                print(f"No live data available for {sport} - skipping")
+                continue
             
             for game in odds_data:
                 for bookmaker in game.get('bookmakers', []):

@@ -99,67 +99,7 @@ class ScanResult:
     risk_metrics: Dict[str, float]
     model_performance: Dict[str, float] = field(default_factory=dict)
 
-# ---------------------------------------------------------------------------
-# Mock data generation (for production demo)
-# ---------------------------------------------------------------------------
 
-def generate_sample_games() -> List[Dict[str, Any]]:
-    """Generate sample games for demonstration when APIs are unavailable."""
-    
-    mlb_teams = [
-        "New York Yankees", "Boston Red Sox", "Houston Astros", "Los Angeles Dodgers",
-        "Atlanta Braves", "Seattle Mariners", "Colorado Rockies", "Milwaukee Brewers",
-        "Pittsburgh Pirates", "San Francisco Giants", "Texas Rangers", "Oakland Athletics"
-    ]
-    
-    soccer_teams = [
-        "Manchester United", "Liverpool", "Arsenal", "Chelsea", "Real Madrid", 
-        "Barcelona", "Bayern Munich", "Paris Saint-Germain", "Juventus", "Inter Milan"
-    ]
-    
-    games = []
-    
-    # Generate MLB games
-    for i in range(15):
-        home_team = random.choice(mlb_teams)
-        away_team = random.choice([t for t in mlb_teams if t != home_team])
-        
-        # Generate realistic odds
-        home_odds = random.uniform(-200, 150)
-        away_odds = -(100 / ((100/abs(home_odds)) if home_odds < 0 else (home_odds/100))) if home_odds > 0 else -(home_odds)
-        
-        games.append({
-            'sport': 'MLB',
-            'game_id': f'mlb_{i}',
-            'home_team': home_team,
-            'away_team': away_team,
-            'commence_time': (datetime.now() + timedelta(hours=random.randint(1, 24))).isoformat(),
-            'bookmaker': 'DraftKings',
-            'home_odds': home_odds,
-            'away_odds': away_odds,
-            'over_under': random.uniform(7.5, 11.5),
-            'over_odds': random.uniform(-120, 120),
-            'under_odds': random.uniform(-120, 120)
-        })
-    
-    # Generate Soccer games
-    for i in range(20):
-        home_team = random.choice(soccer_teams)
-        away_team = random.choice([t for t in soccer_teams if t != home_team])
-        
-        games.append({
-            'sport': 'Soccer',
-            'game_id': f'soccer_{i}',
-            'home_team': home_team,
-            'away_team': away_team,
-            'commence_time': (datetime.now() + timedelta(hours=random.randint(1, 72))).isoformat(),
-            'bookmaker': 'bet365',
-            'home_odds': random.uniform(-150, 300),
-            'away_odds': random.uniform(-150, 300),
-            'draw_odds': random.uniform(200, 400)
-        })
-    
-    return games
 
 # ---------------------------------------------------------------------------
 # Core betting model
@@ -182,21 +122,31 @@ class BettingModel:
         
     @retry(stop=stop_after_attempt(3), wait=wait_fixed(1))
     def fetch_odds_data(self) -> List[Dict[str, Any]]:
-        """Fetch odds data from APIs with fallback to sample data."""
+        """Fetch odds data from APIs - only real data, no mock data."""
         
         try:
-            # Try to fetch real data (would use actual API endpoints in production)
-            if ODDS_API_KEY != "demo_key":
-                # Real API call would go here
-                pass
+            # Use the real API call from main.py
+            from main import fetch_odds
             
-            # Fall back to sample data for demo
-            print("📊 Using sample data for demonstration")
-            return generate_sample_games()
+            odds_data = []
+            sports = ['MLB', 'NBA', 'Soccer', 'WNBA', 'NHL']
+            
+            for sport in sports:
+                sport_odds = fetch_odds(ODDS_API_KEY, sport)
+                if sport_odds:
+                    odds_data.extend(sport_odds)
+                else:
+                    print(f"No live data available for {sport}")
+            
+            if not odds_data:
+                print("⚠️  No live odds data available from any sport")
+                return []
+            
+            return odds_data
             
         except Exception as e:
-            print(f"⚠️  API fetch failed, using sample data: {e}")
-            return generate_sample_games()
+            print(f"⚠️  API fetch failed: {e}")
+            return []
     
     def calculate_fair_odds(self, game: Dict[str, Any]) -> Dict[str, float]:
         """Calculate fair odds using sport-specific models."""
