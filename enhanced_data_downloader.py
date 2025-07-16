@@ -216,19 +216,19 @@ class EnhancedDataDownloader:
         primary_source = DATA_SOURCES["soccer"]["primary"]
         fallback_sources = DATA_SOURCES["soccer"]["fallback"]
         
-        # Process leagues using correct 2025 FootyStats IDs
-        for league_name, league_id in FOOTYSTATS_LEAGUE_IDS.items():
+        # Process leagues using correct FootyStats league IDs and seasons
+        for league_name, league_config in FOOTYSTATS_LEAGUE_IDS.items():
             result["total_attempts"] += 1
             result["leagues_processed"] += 1
             
-            logger.info(f"📥 Downloading {league_name} (ID: {league_id})")
+            logger.info(f"📥 Downloading {league_name} (ID: {league_config['league_id']}, Season: {league_config['season']})")
             
             # Try primary source first (FootyStats)
             data = self._download_from_source(
                 source=primary_source,
                 sport="soccer", 
                 league_name=league_name,
-                league_id=league_id,
+                league_id=league_config,
                 timeframe=timeframe
             )
             
@@ -292,36 +292,50 @@ class EnhancedDataDownloader:
             return None
     
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-    def _download_footystats(self, league_id: int, timeframe: str) -> Optional[List]:
+    def _download_footystats(self, league_config: dict, timeframe: str) -> Optional[List]:
         """Download data from FootyStats API using correct API structure."""
         
         try:
-            # Use correct FootyStats API endpoints
-            # Try league-season endpoint first
-            season_url = get_league_season_url(league_id)
-            logger.debug(f"FootyStats season request: {season_url}")
+            league_id = league_config["league_id"]
+            season = league_config["season"]
             
-            response = self.session.get(season_url, timeout=30)
+            # Use correct FootyStats API endpoints
+            # Try league-matches endpoint first
+            matches_url = get_league_matches_url(league_id, season)
+            logger.debug(f"FootyStats matches request: {matches_url}")
+            
+            response = self.session.get(matches_url, timeout=30)
             
             if response.status_code == 200:
-                season_data = response.json()
-                logger.debug(f"✅ FootyStats season data retrieved for season_id {league_id}")
+                matches_data = response.json()
+                logger.debug(f"✅ FootyStats matches data retrieved for league_id {league_id}, season {season}")
                 
-                # Also get teams data with stats
-                teams_url = get_league_teams_url(league_id, include_stats=True)
+                # Also get teams data
+                teams_url = get_league_teams_url(league_id, season)
                 logger.debug(f"FootyStats teams request: {teams_url}")
                 
                 teams_response = self.session.get(teams_url, timeout=30)
                 
                 combined_data = {
-                    "season_info": season_data,
+                    "league_id": league_id,
+                    "season": season,
+                    "matches": [],
                     "teams": []
                 }
                 
+                # Handle matches data
+                if isinstance(matches_data, dict):
+                    combined_data["matches"] = matches_data.get('data', [])
+                    success = matches_data.get('success', True)
+                    if not success:
+                        logger.warning(f"⚠️  FootyStats API reported failure for league_id {league_id}")
+                elif isinstance(matches_data, list):
+                    combined_data["matches"] = matches_data
+                
+                # Handle teams data
                 if teams_response.status_code == 200:
                     teams_data = teams_response.json()
                     
-                    # Handle different response formats
                     if isinstance(teams_data, dict):
                         teams = teams_data.get('data', [])
                     elif isinstance(teams_data, list):
@@ -330,7 +344,7 @@ class EnhancedDataDownloader:
                         teams = []
                     
                     combined_data["teams"] = teams
-                    logger.debug(f"✅ FootyStats returned {len(teams)} teams for season_id {league_id}")
+                    logger.debug(f"✅ FootyStats returned {len(teams)} teams for league_id {league_id}")
                 else:
                     logger.warning(f"⚠️  Could not fetch teams data: {teams_response.status_code}")
                 
@@ -338,10 +352,10 @@ class EnhancedDataDownloader:
                 return [combined_data]
                 
             elif response.status_code == 422:
-                logger.warning(f"⚠️  Invalid parameters for FootyStats season_id {league_id}")
+                logger.warning(f"⚠️  Invalid parameters for FootyStats league_id {league_id}, season {season}")
                 return None
             elif response.status_code == 404:
-                logger.warning(f"⚠️  No data found for FootyStats season_id {league_id}")
+                logger.warning(f"⚠️  No data found for FootyStats league_id {league_id}, season {season}")
                 return None
             else:
                 logger.warning(f"⚠️  FootyStats API error {response.status_code}")
