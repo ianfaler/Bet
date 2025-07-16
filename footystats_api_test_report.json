@@ -1,0 +1,151 @@
+{
+  "timestamp": "2025-07-16T00:09:41.018145",
+  "api_key_status": "valid",
+  "total_leagues_tested": 10,
+  "successful_leagues": 7,
+  "failed_leagues": 3,
+  "league_test_results": [
+    {
+      "league_name": "English Premier League",
+      "league_id": "1",
+      "season": "2024",
+      "status_code": 200,
+      "success": true,
+      "matches_found": 357,
+      "error": null
+    },
+    {
+      "league_name": "Spanish La Liga",
+      "league_id": "3",
+      "season": "2024",
+      "status_code": 200,
+      "success": true,
+      "matches_found": 306,
+      "error": null
+    },
+    {
+      "league_name": "German Bundesliga",
+      "league_id": "9",
+      "season": "2024",
+      "status_code": 200,
+      "success": true,
+      "matches_found": 380,
+      "error": null
+    },
+    {
+      "league_name": "Italian Serie A",
+      "league_id": "5",
+      "season": "2024",
+      "status_code": 200,
+      "success": true,
+      "matches_found": 306,
+      "error": null
+    },
+    {
+      "league_name": "French Ligue 1",
+      "league_id": "4",
+      "season": "2024",
+      "status_code": 200,
+      "success": true,
+      "matches_found": 306,
+      "error": null
+    },
+    {
+      "league_name": "Dutch Eredivisie",
+      "league_id": "13",
+      "season": "2024",
+      "status_code": 417,
+      "success": false,
+      "matches_found": 0,
+      "error": "HTTP 417"
+    },
+    {
+      "league_name": "Portuguese Primeira Liga",
+      "league_id": "63",
+      "season": "2024",
+      "status_code": 417,
+      "success": false,
+      "matches_found": 0,
+      "error": "HTTP 417"
+    },
+    {
+      "league_name": "Brazilian Serie A",
+      "league_id": "11",
+      "season": "2024",
+      "status_code": 200,
+      "success": true,
+      "matches_found": 380,
+      "error": null
+    },
+    {
+      "league_name": "US MLS",
+      "league_id": "50",
+      "season": "2024",
+      "status_code": 417,
+      "success": false,
+      "matches_found": 0,
+      "error": "HTTP 417"
+    },
+    {
+      "league_name": "Mexican Liga MX",
+      "league_id": "84",
+      "season": "2024",
+      "status_code": 200,
+      "success": true,
+      "matches_found": 306,
+      "error": null
+    },
+    {
+      "league_name": "English Premier League",
+      "league_id": "1",
+      "season": "2024",
+      "status_code": 200,
+      "success": true,
+      "matches_found": 357,
+      "error": null
+    },
+    {
+      "league_name": "Spanish La Liga",
+      "league_id": "3",
+      "season": "2024",
+      "status_code": 200,
+      "success": true,
+      "matches_found": 306,
+      "error": null
+    },
+    {
+      "league_name": "German Bundesliga",
+      "league_id": "9",
+      "season": "2024",
+      "status_code": 200,
+      "success": true,
+      "matches_found": 380,
+      "error": null
+    },
+    {
+      "league_name": "Italian Serie A",
+      "league_id": "5",
+      "season": "2024",
+      "status_code": 200,
+      "success": true,
+      "matches_found": 306,
+      "error": null
+    },
+    {
+      "league_name": "French Ligue 1",
+      "league_id": "4",
+      "season": "2024",
+      "status_code": 200,
+      "success": true,
+      "matches_found": 306,
+      "error": null
+    }
+  ],
+  "sample_data": {
+    "premier_league_test": {
+      "status_code": 200,
+      "data_type": "dict",
+      "data_preview": "{'success': True, 'pager': {'current_page': 1, 'max_page': 1, 'results_per_page': 600, 'total_results': 357}, 'metadata': {'request_limit': '1800', 'request_remaining': '1795', 'request_reset_message': 'Request limit is refreshed every hour.'}, 'data': [{'id': 7170055, 'homeID': 4, 'awayID': 19, 'season': '2016', 'status': 'complete', 'roundID': 102974, 'game_week': 0, 'revised_game_week': -1, 'homeGoals': [], 'awayGoals': ['82', '90+1'], 'homeGoalCount': 0, 'awayGoalCount': 2, 'totalGoalCount':"
+    }
+  }
+}
