@@ -32,7 +32,7 @@ class BettingModelTester(unittest.TestCase):
     # Class variables to persist across test instances
     test_results = {
         'data_fetch
-Thought for 3s
+
 Here's the complete contents of test_betting_model.py:
 
 #!/usr/bin/env python3
